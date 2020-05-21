@@ -91,4 +91,3 @@ async def main(t, c):
 #asyncio.run(main(TOKEN, CHANNEL))
 client = BotAccess()
 client.run(client.token)
-#client.run('NzA2MTAwNjAwODUyNDQ3Mjk1.Xq1Vxg.4Vg1O4thnlsdRb0fWqCq8K9IfIg')
