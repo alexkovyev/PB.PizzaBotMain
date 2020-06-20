@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from recipe_class import Recipy
+from .recipe_class import Recipy
 
 
 class BaseOrder(object):
@@ -113,24 +113,6 @@ class BaseDish(Recipy):
         # у каждой ячейки выдачи есть 2 "лотка", нужно распределить в какой лоток помещает блюдо
         self.pickup_point_unit: int
         self.is_dish_ready = None
-
-    def status_change(self, new_status):
-        """Метод меняет статус блюда.
-        что то коряво, переделать
-        """
-        try:
-            if new_status in self.DISH_STATUSES:
-                self.status = new_status
-                return self.status
-            else:
-                raise PbmError.PbmFatalError("Предлагаемый статус блюда не найден ")
-        except PbmError.PbmFatalError:
-            assert PbmError.PbmFatalError
-        try:
-            print("Запысываем статус в БД")
-            # обновление статуса в БД
-        except PbmError.DataBaseError:
-            print("Ошибка БД")
 
     def __repr__(self):
         return f"Блюдо {self.id} состоит из {self.dough}, {self.sauce}, {self.filling}, {self.additive}  " \

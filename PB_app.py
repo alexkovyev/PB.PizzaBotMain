@@ -1,6 +1,6 @@
 import asyncio
 
-from server import PizzaBotMain
+from server.server import PizzaBotMain
 
 if __name__ == "__main__":
     app = PizzaBotMain()

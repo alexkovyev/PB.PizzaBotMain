@@ -2,11 +2,12 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import time
+import types
 
 from functools import partial
 
 from kiosk_modes.BaseMode import BaseMode
-from recipe_data import recipe_data
+from config.recipe_data import recipe_data
 from .BaseOrder import BaseOrder
 from RA.RA import RA
 from controllers.ControllerBus import Controllers
@@ -24,7 +25,7 @@ class BeforeCooking(object):
         # вызывается какой то супер метод контроллеров на проверку, возвращает status и dict с данными об оборудовании
         is_equipment_ok = True
         print("Начинаем тестировать оборудования", time.time())
-        time.sleep(40)
+        time.sleep(10)
         print("Оборудование протестировано, исправно", time.time())
         return is_equipment_ok, equipment_data
 
@@ -32,7 +33,7 @@ class BeforeCooking(object):
     def parse_recipes(clx):
         """Парсит все рецепты в директории и возвращает словарь вида: описать"""
         print("Начинаем парсить рецепты", time.time())
-        time.sleep(40)
+        time.sleep(10)
         print("Рецепты спарсены", time.time())
         recipes = recipe_data
         return recipes
@@ -199,7 +200,7 @@ class CookingMode(BaseMode):
 
     async def reserve_oven(self, new_order, oven_data):
         print("Это блюда в заказе", new_order, oven_data)
-        ovens_reserved = [await oven_data.oven_reserve(dish) for dish in new_order["dishes"]]
+        ovens_reserved = [oven_data.oven_reserve(dish) for dish in new_order["dishes"]]
         return ovens_reserved
 
     async def create_new_order(self, new_order, oven_data):
@@ -211,16 +212,17 @@ class CookingMode(BaseMode):
             order_content = await self.get_order_content_from_db(new_order)
             await self.get_recipe_data(order_content["dishes"])
             # резервируем печи для заказа (сразу 2 шт)
-            ovens_reserved = await self.reserve_oven(new_order, oven_data)
+            ovens_reserved = await self.reserve_oven(order_content, oven_data)
             # создаем экземпляр класса заказа
-            order = BaseOrder(new_order, ovens_reserved)
+            order = BaseOrder(order_content, ovens_reserved)
             if order:
                 # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
                 self.current_orders_proceed[order.ref_id] = order
-                # for dish in order.dishes:
-                #     await self.put_chains_in_queue(dish)
-                # await order.create_monitoring()
-                # asyncio.create_task(order.dish_readiness_monitoring())
+                print(self.current_orders_proceed)
+                for dish in order.dishes:
+                    await self.put_chains_in_queue(dish)
+                await order.create_is_order_ready_monitoring()
+                asyncio.create_task(order.order_readiness_monitoring())
 
         # придумать ошибки какие могут быть
         except ValueError:

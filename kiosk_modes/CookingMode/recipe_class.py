@@ -2,11 +2,11 @@
 import asyncio
 import time
 
-from RA import RA
-from RA import RAError
-from controllers import Controllers
+from RA.RA import RA
+from RA.RA import RAError
+from controllers.ControllerBus import Controllers
 
-from settings import OVEN_LIQUIDATION_TIME
+from config.config import OVEN_LIQUIDATION_TIME
 
 
 class ConfigMixin(object):

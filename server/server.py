@@ -5,14 +5,13 @@ import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config import SERVER_HOST, SERVER_PORT
+from config.config import SERVER_HOST, SERVER_PORT
 from controllers.ControllerBus import ControllersEvents, event_generator
-from discord_sender import DiscordBotSender
-from equipment import Equipment
+from notifications.discord_sender import DiscordBotSender
+from server.equipment import Equipment
 from kiosk_modes.CookingMode import CookingMode
-from kiosk_modes import (TestingMode,
-                         StandByMode)
-from logs import PBlogs
+from kiosk_modes import (StandByMode)
+from logs.logs import PBlogs
 
 
 class PizzaBotMain(object):
@@ -67,7 +66,7 @@ class PizzaBotMain(object):
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
         # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='18', minute=19, second=0)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='20', minute=1, second=0)
         return scheduler
 
     def get_config_data(self):
@@ -76,8 +75,9 @@ class PizzaBotMain(object):
     async def get_equipment_data(self):
         print("Подключаемся к БД за информацией", time.time())
         await asyncio.sleep(10)
+        oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
         equipment_data = {
-            "ovens": {i: {"oven_id": str(uuid.uuid4()), "status": "free"} for i in range(1, 22)},
+            "ovens": {i: {"oven_id": i, "status": "free"} for i in oven_ids},
             "cut_station": {"id": "f50ec0b7-f960-400d-91f0-c42a6d44e3d0",
                             "status": "ok"},
             "package_station": {"id": "afeb1c10-83ef-4194-9821-491fcf0aa52b",
