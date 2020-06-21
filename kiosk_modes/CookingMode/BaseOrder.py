@@ -91,6 +91,7 @@ class BaseDish(Recipy):
     """Этот класс представляет собой шаблон блюда в заказе."""
     DISH_STATUSES = ["received", "cooking", "failed_to_be_cooked", "ready",
                      "packed", "wait to delivery", "time_is_up"]
+    STOP_STATUS = "failed_to_be_cooked"
 
     def __init__(self, dish_id, dish_data, free_oven_id):
         super().__init__()
@@ -176,6 +177,7 @@ class BaseFilling(object):
         self.filling_id = filling_data["id"]
         self.filling_content = filling_data["content"]
         self.cell_data_unpack()
+        # self.filling_parts = self.create_filling_parts(filling_data["content"])
 
     def cell_data_unpack(self):
         """Элемент списка начинки выглядит вот так, последний элемент - это место хранения
@@ -188,9 +190,27 @@ class BaseFilling(object):
 
         self.filling_content = [item + [value] for item, value in zip(self.filling_content, input_data)]
 
+
+    # def create_filling_parts(self, filling_data):
+    #     new_list = []
+    #     for filling_part in filling_data:
+    #         filling_part_id, recipe_program = filling_part
+    #         item = BaseFillingPart(filling_part_id, recipe_program)
+    #         new_list.append(item)
+    #     return new_list
+
     def __repr__(self):
         return f"Начинка {self.filling_id}"
 
+
+# class BaseFillingPart(Recipy):
+#     def __init__(self, product_id, cutting_program):
+#         self.filling_part_id = product_id
+#         self.cutting_recipe = cutting_program["program_id"]
+#         self.cutting_duration = cutting_program["duration"]
+#         # сделать назначение п-ф
+#         self.fridge_container = "d4"
+#         self.fridge_location = (3, 4)
 
 class BaseAdditive(BasePizzaPart):
     """Этот класс описывает добавку"""

@@ -32,10 +32,14 @@ class PizzaBotMain(object):
     def setup_routes(self, app):
         app.add_routes([
             web.post("/api/new_order", self.new_order_handler),
+            web.get("/", self.hello),
             # все доступные команды
             # web.get("/api/commands", None),
             # web.post("/api/commands/cooking_mode", None)
         ])
+
+    async def hello(self, request):
+        return web.Response(text="Тут все работает")
 
     async def new_order_handler(self, request):
         print("Получили запрос от SS на новый заказ", time.time())
@@ -46,16 +50,22 @@ class PizzaBotMain(object):
             if can_receive_new_order:
                 try:
                     is_it_new_order = await self.current_instance.checking_order_for_double(new_order_id)
+                    print("Это новый заказ")
                     if is_it_new_order:
-                        asyncio.create_task(self.current_instance.create_new_order(new_order_id,
+                        print("В этом ифе")
+                        print(self.current_instance.create_new_order)
+                        print(self.equipment.oven_available)
+                        await asyncio.create_task(self.current_instance.create_new_order(new_order_id,
                                                                                    self.equipment.oven_available))
                         message = "Заказ успешно принят"
                         raise web.HTTPCreated(text=message)
                     else:
                         message = "Этот заказ уже находится в обработке"
                         raise web.HTTPOk(text=message)
-                except AttributeError:
+                except AttributeError as e:
                     print("Не создан инстанс cooking mode или метод не найден")
+                    print(e)
+                    raise web.HTTPServerError(text="Ошибка века в сервере")
             else:
                 message = "Заказы не принимаем, приходите завтра"
                 raise web.HTTPNotAcceptable(text=message)
@@ -66,7 +76,7 @@ class PizzaBotMain(object):
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
         # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='20', minute=1, second=0)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='0', minute=23, second=30)
         return scheduler
 
     def get_config_data(self):
@@ -101,8 +111,10 @@ class PizzaBotMain(object):
         return equipment_data
 
     async def add_equipment_data(self):
+        print("Начинаем собирать данные об оборудовании", time.time())
         equipment_data = await self.get_equipment_data()
         self.equipment = Equipment(equipment_data)
+        print("Закончили собирать данные об оборудовании", time.time())
 
     async def is_open_for_new_orders(self):
         return True if self.kiosk_status == "cooking" else False
@@ -112,6 +124,9 @@ class PizzaBotMain(object):
         if self.kiosk_status == "stand_by":
             print("ЗАПУСКАЕМ режим ГОТОВКИ")
             self.current_instance = CookingMode.BeforeCooking()
+            if self.equipment is None:
+                print("ОШИБКА ОБОРУДОВАНИЯ")
+                self.equipment = await self.add_equipment_data()
             (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
             self.current_instance = CookingMode.CookingMode(recipe)
             self.kiosk_status = "cooking"
@@ -146,10 +161,6 @@ class PizzaBotMain(object):
         oven_status = event_data["status"]
         print("Обработали", oven_id, oven_status)
 
-    async def main_worker(self):
-        print("Работает основной worker")
-        await asyncio.sleep(5)
-
     async def create_tasks(self, app, scheduler):
         runner = web.AppRunner(app)
         await runner.setup()
@@ -161,12 +172,11 @@ class PizzaBotMain(object):
         on_start_tasks = asyncio.create_task(self.add_equipment_data())
         controllers_bus = asyncio.create_task(event_generator(self.cntrls_events))
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
-        main_flow = asyncio.create_task(self.main_worker())
         discord_sender = asyncio.create_task(DiscordBotSender.send_message())
         test_task = asyncio.create_task(self.test_working())
         logging_task = asyncio.create_task(PBlogs.logging_task())
 
-        await asyncio.gather(controllers_bus, test_task, event_listener, main_flow, discord_sender, logging_task,
+        await asyncio.gather(controllers_bus, test_task, event_listener, discord_sender, logging_task,
                              on_start_tasks)
 
     def start_server(self):

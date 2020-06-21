@@ -33,11 +33,19 @@ class Equipment(object):
 
 class Oven(object):
     def __init__(self, ovens_data):
-        self.oven_units = ovens_data
+        # self.oven_units = ovens_data
+        self.oven_units = {i: OvenUnit(ovens_data[i]) for i in ovens_data}
+
+    # def fetch_free_oven_list(self):
+    #     """Этот метод получает список печей со статусом свободны"""
+    #     free_oven = [oven for oven in self.oven_units.values() if oven["status"] == "free"]
+    #     return free_oven
 
     def fetch_free_oven_list(self):
         """Этот метод получает список печей со статусом свободны"""
-        free_oven = [oven for oven in self.oven_units.values() if oven["status"] == "free"]
+        free_oven = [oven for oven in self.oven_units.values() if oven.status == "free"]
+        # тут список объектов
+        print("Это свободная печь", free_oven)
         return free_oven
 
     # def is_able_to_cook(self):
@@ -52,23 +60,58 @@ class Oven(object):
     #         else False
     #     return equipment_status
 
+    # def get_first_free_oven(self):
+    #     """Этот метод получает id печи, котрая последняя в списке свободных"""
+    #     free_oven_list = self.fetch_free_oven_list()
+    #     if free_oven_list:
+    #         oven_id = free_oven_list.pop()["oven_id"]
+    #         print("Выбрана печь", oven_id)
+    #     else:
+    #         print("Нет свободных печей")
+    #         # нужно добавить обработчик что делать если блюда 2 а печь свободная 1 шт
+    #     return oven_id
+
     def get_first_free_oven(self):
         """Этот метод получает id печи, котрая последняя в списке свободных"""
         free_oven_list = self.fetch_free_oven_list()
         if free_oven_list:
-            oven_id = free_oven_list.pop()["oven_id"]
+            oven_id = free_oven_list.pop().oven_id
             print("Выбрана печь", oven_id)
         else:
             print("Нет свободных печей")
             # нужно добавить обработчик что делать если блюда 2 а печь свободная 1 шт
         return oven_id
 
+    # def oven_reserve(self, dish_id):
+    #     oven_id = self.get_first_free_oven()
+    #     self.oven_units[oven_id]["status"] = "reserved"
+    #     self.oven_units[oven_id]["dish"] = dish_id
+    #     print("Статус изменен")
+    #     return oven_id
+
     def oven_reserve(self, dish_id):
         oven_id = self.get_first_free_oven()
-        self.oven_units[oven_id]["status"] = "reserved"
-        self.oven_units[oven_id]["dish"] = dish_id
+        self.oven_units[oven_id].status = "reserved"
+        self.oven_units[oven_id].dish = dish_id
         print("Статус изменен")
         return oven_id
+
+    # async def oven_broke_handler(self, event_data):
+    #     """Это группа функций обрабатывает поломку печи.
+    #     - поиск назначенных блюд на печь
+    #     - замена печи на исправную
+    #     - смена статуса, запись в БД ? Или это контролер делает?
+    #     """
+    #     print("Обрабатываем уведомление об оборудовании", event_data)
+    #     oven_id = int(event_data["unit_name"])
+    #     oven_status = event_data["status"]
+    #     if self.oven_units[oven_id]["status"] == "reserved":
+    #         print("Нужно переназначить печь")
+    #         print("Перезначаем блюдо", self.oven_units[oven_id]["dish"])
+    #         # new_oven_id = self.get_first_free_oven()
+    #     self.oven_units[oven_id]["status"] = oven_status
+    #     print("Мы обработали печь")
+    #     print("Вот такие печи", self.oven_units)
 
     async def oven_broke_handler(self, event_data):
         """Это группа функций обрабатывает поломку печи.
@@ -79,31 +122,17 @@ class Oven(object):
         print("Обрабатываем уведомление об оборудовании", event_data)
         oven_id = int(event_data["unit_name"])
         oven_status = event_data["status"]
-        if self.oven_units[oven_id]["status"] == "reserved":
+        if self.oven_units[oven_id].status == "reserved":
             print("Нужно переназначить печь")
-            print("Перезначаем блюдо", self.oven_units[oven_id]["dish"])
+            print("Перезначаем блюдо", self.oven_units[oven_id].dish)
             # new_oven_id = self.get_first_free_oven()
-        self.oven_units[oven_id]["status"] = oven_status
+        self.oven_units[oven_id].status = oven_status
         print("Мы обработали печь")
         print("Вот такие печи", self.oven_units)
 
-    # async def set_oven_timer(self):
-    #     print("!!!!!!!!!!ставим таймер на печь", time.time())
-    #     oven_future = asyncio.get_running_loop().create_future()
-    #     self.oven_future = oven_future
-    #     print("Это футура в заказе", self.oven_future)
-    #     await asyncio.create_task(self.oven_timer())
-    #
-    # async def oven_timer(self):
-    #     print("!!!!!!!!!!!!Начинаем ждать первый интервал", time.time())
-    #     print("Статус печи", self.oven_unit)
-    #     await asyncio.sleep(OVEN_LIQUIDATION_TIME)
-    #     print("!!!!!!!!!!! время сна завершено",time.time())
-    #     if not self.oven_future.cancelled():
-    #         print("!!!!!!!!!!!!!!Футура блюдо не забрали")
-    #         self.oven_future.set_result("time is over")
-    #         await self.dish_liquidation()
-    #
-    # async def time_changes_handler(self, time_futura):
-    #     """Обрабатывает результаты футуры об изменении времени выпечки"""
-    #     print(time_futura, time.time())
+
+class OvenUnit(object):
+    def __init__(self, oven_data):
+        self.oven_id = oven_data["oven_id"]
+        self.status = oven_data["status"]
+        self.dish = None

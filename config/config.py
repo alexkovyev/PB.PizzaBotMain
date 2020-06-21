@@ -11,10 +11,9 @@ SCHEDULE = {
 }
 
 #время в мин до ликвидации заказа после информирования о готовности
-OVEN_LIQUIDATION_TIME = 15
+OVEN_LIQUIDATION_TIME = 60
 
-# время на получение заказа в ячейке
-liquidation_time_pick_point = 20
+OVEN_FREE_WAITING_TIME = 15
 
 QT_DISH_PER_ORDER = 2
 

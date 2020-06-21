@@ -6,7 +6,7 @@ from RA.RA import RA
 from RA.RA import RAError
 from controllers.ControllerBus import Controllers
 
-from config.config import OVEN_LIQUIDATION_TIME
+from config.config import OVEN_LIQUIDATION_TIME, OVEN_FREE_WAITING_TIME
 
 
 class ConfigMixin(object):
@@ -59,12 +59,12 @@ class Recipy(ConfigMixin):
 
     async def atomic_chain_execute(self, atomic_params_dict):
         duration = await self.get_atomic_chain_duration(atomic_params_dict)
-        if self.status != "failed_to_be_cooked":
+        if self.status != self.STOP_STATUS:
             try:
                 await RA.atomic_action(**atomic_params_dict)
                 print("Успешно выполнили атомарное действие", atomic_params_dict["name"])
             except RAError:
-                self.status = "failed_to_be_cooked"
+                self.status = self.STOP_STATUS
                 print("Ошибка атомарного действия")
 
     async def move_to_object(self, move_params):
@@ -92,9 +92,8 @@ class Recipy(ConfigMixin):
                 result = await RA.dance_for_time(dance_time)
                 if result:
                     print("RBA успешно подъехал к", place_to, time.time())
-                    # self.status = "cooking"
         except RAError:
-            self.status = "failed_to_be_cooked"
+            self.status = self.STOP_STATUS
             # есть ли какой то метод проверки работоспособности
             # что деламем? сворачиваем работу или продолжаем дальше
         # return self.status
@@ -107,13 +106,11 @@ class Recipy(ConfigMixin):
         chain_result = await Controllers.give_dough(dough_point)
         if chain_result:
             print("взяли тесто у контроллеров")
-            # self.status = "cooking"
         else:
             print("Ошибка получения теста у контроллеров")
-            self.status = "failed_to_be_cooked"
+            self.status = self.STOP_STATUS
         # запускает метод списать п\ф
         print("СТАТУС блюда после получения теста", self.status)
-        # return self.status
 
     async def controllers_give_sauce(self):
         """Вызов метода контроллеров для поливания соусом"""
@@ -128,13 +125,10 @@ class Recipy(ConfigMixin):
             print("успешно полили соусом")
             self.is_cut_station_free.set()
             print("Статус станции нарезки после сет", self.is_cut_station_free.is_set())
-            # self.status = "cooking"
         else:
             print("---!!! Не успешно полили соусом")
-            self.status = "failed_to_be_cooked"
-            # return self.status, self.is_cut_station_free
+            self.status = self.STOP_STATUS
         print("СТАТУС блюда после поливки соусом", self.status)
-        # return self.status, self.is_cut_station_free
 
     async def controllers_oven(self, oven_mode, recipe):
         time_changes = asyncio.get_running_loop().create_future()
@@ -153,11 +147,10 @@ class Recipy(ConfigMixin):
             print("успешно нарезали п\ф", time.time())
             self.is_cut_station_free.set()
             self.time_limit = None
-            # self.status = "cooking"
             print("СНЯТ временой ЛИМИТ в", time.time())
         else:
             print("---!!! Не успешно нарезали п\ф")
-            self.status = "failed_to_be_cooked"
+            self.status = self.STOP_STATUS
         print("СТАТУС блюда в нарезке", self.status)
 
     async def controllers_give_paper(self):
@@ -174,31 +167,35 @@ class Recipy(ConfigMixin):
     async def chain_execute(self, chain_list):
         try:
             for chain in chain_list:
-                if self.status != "failed_to_be_cooked":
+                if self.status != self.STOP_STATUS:
                     chain, params = chain
                     await chain(params)
                 else:
                     break
         except RAError:
-            self.status = "failed_to_be_cooked"
+            self.status = self.STOP_STATUS
             print("Ошибка века")
 
     @staticmethod
-    async def is_need_to_change_gripper(required_gripper: str):
+    async def is_need_to_change_gripper(current_gripper: str, required_gripper: str):
         """метод проверяет Нужно ли менять захват
         """
-        current_gripper = await RA.get_current_gripper()
         if str(current_gripper) != required_gripper:
             return True
         return False
 
     async def change_gripper(self, required_gripper: str):
-        is_need_to_change_gripper = await self.is_need_to_change_gripper(required_gripper)
+        current_gripper = await RA.get_current_gripper()
+        is_need_to_change_gripper = await self.is_need_to_change_gripper(current_gripper, required_gripper)
         print("Проверяем, нужно ли менять захват", is_need_to_change_gripper)
         if is_need_to_change_gripper:
             await self.move_to_object((self.CAPTURE_STATION, None))
-            await self.atomic_chain_execute({"place":"get_gripper", "name":"get_gripper"})
-        # return self.status
+            while current_gripper != required_gripper:
+                if current_gripper is not None:
+                    await self.atomic_chain_execute({"place": "gripper_unit", "name": "set_gripper"})
+                    await self.atomic_chain_execute({"place": "gripper_unit", "name": "get_gripper"})
+                else:
+                    await self.atomic_chain_execute({"place": "gripper_unit", "name": "get_gripper"})
 
     async def get_vane_from_oven(self, *args):
         """Этот метод запускает группу атомарных действий RA по захвату лопатки из печи"""
@@ -271,24 +268,24 @@ class Recipy(ConfigMixin):
         }
         await self.atomic_chain_execute(atomic_params)
 
-    async def set_oven_timer(self):
+    async def set_oven_timer(self, *args):
         print("!!!!!!!!!!ставим таймер на печь", time.time())
         oven_future = asyncio.get_running_loop().create_future()
         self.oven_future = oven_future
-        print("Это футура в заказе", self.oven_future)
         await asyncio.create_task(self.oven_timer())
 
-    async def oven_timer(self):
+    async def oven_timer(self, *args):
         print("!!!!!!!!!!!!Начинаем ждать первый интервал", time.time())
         print("Статус печи", self.oven_unit)
+        # args[o].equipment[]
         await asyncio.sleep(OVEN_LIQUIDATION_TIME)
         print("!!!!!!!!!!! время сна завершено",time.time())
         if not self.oven_future.cancelled():
-            print("!!!!!!!!!!!!!!Футура блюдо не забрали")
+            print("!!!!!!!!!!!!!!Футура закончилась, блюдо не забрали")
             self.oven_future.set_result("time is over")
             await self.throwing_dish_away(self.oven_unit)
 
-    async def time_changes_handler(self, time_futura):
+    async def time_changes_handler(self, time_futura, *args):
         """Обрабатывает результаты футуры об изменении времени выпечки"""
         print(time_futura, time.time())
 
@@ -318,8 +315,10 @@ class Recipy(ConfigMixin):
     async def chain_get_dough_and_sauce(self, *args):
         """Подумать как разделить на 2 части"""
         print("Начинается chain Возьми ТЕСТО", time.time())
-        self.status = self.status_change("cooking")
-        chain_list = [(self.move_to_object, (self.oven_unit, None)),
+        self.status = "cooking"
+        # self.status = self.status_change("cooking")
+        chain_list = [(self.change_gripper, "None"),
+                      (self.move_to_object, (self.oven_unit, None)),
                       (self.get_vane_from_oven, None),
                       (self.move_to_object, (self.SLICING, None)),
                       (self.controllers_get_dough, None),
@@ -329,18 +328,19 @@ class Recipy(ConfigMixin):
                       ]
         await self.chain_execute(chain_list)
         print("Закончили с ТЕСТОМ",time.time(), self.status)
+        # модет быть просто сделать create task
         if self.status != "failed_to_be_cooked":
-            await args[0].immediately_executed_queue.put(self.controllers_give_sauce)
-            print("Добавили политие соусом в очередь")
-        print("СТАТУС блюда после теста", self.status)
+            asyncio.create_task(self.controllers_give_sauce())
+            # await args[1].immediately_executed_queue.put(self.controllers_give_sauce)
+            print("Запустили политие соусом в очередь", time.time())
+        print("СТАТУС блюда после теста", self.status, time.time())
 
-    async def get_filling_chain(self, storage_adress, cutting_program, *args):
+    async def get_filling_chain(self, *args):
         """Чейн по доставке и нарезки 1 п\ф"""
         print("% % % Начинаем чейн НАЧИНКИ", time.time())
-        print(storage_adress, cutting_program)
-        # print("Адрес в холоильнике", storage_adress)
-        # print("Это статус блюда в начинке",self.status)
-        # print("Это программа нарезки", cutting_program)
+        print(args)
+        (filling_item, cutting_program, storage_adress) = args[0]
+        print(filling_item.upper())
         chain_list = [(self.change_gripper, "product"),
                       (self.bring_half_staff, storage_adress),
                       (self.put_half_staff_in_cut_station, None),
@@ -350,7 +350,7 @@ class Recipy(ConfigMixin):
             self.time_limit = time.time() + cutting_program["duration"]
             self.is_cut_station_free.clear()
             print("% % % УСТАНОВЛЕН лимит времени, начинаем нарезку в", time.time(), "сам лимит", self.time_limit)
-            await args[0].immediately_executed_queue.put((self.controllers_cut_half_staff, cutting_program))
+            asyncio.create_task(self.controllers_cut_half_staff(cutting_program))
         print("СТАТУС блюда после начинки",self.status)
 
     async def bring_vane_to_oven(self, *args):
@@ -364,21 +364,21 @@ class Recipy(ConfigMixin):
         print("СТАНЦИЯ НАРЕЗКИ СВОБОДНА", self.is_cut_station_free.is_set())
         while not self.is_cut_station_free.is_set():
             try:
-                first_task_to_do = args[0].delivery_queue.get_nowait()
+                first_task_to_do = args[1].delivery_queue.get_nowait()
             except asyncio.QueueEmpty:
                 print("Доставлять нечего, поработаем в другом месте")
             try:
-                task_to_do = args[0].maintain_queue.get_nowait()
+                task_to_do = args[1].maintain_queue.get_nowait()
             except asyncio.QueueEmpty:
                 print("Мыть ничего не нужно, тоска")
             print("Танцеуем")
             await RA.dance()
 
-        await args[0].immediately_executed_queue.put(self.controllers_turn_heating_on)
+        asyncio.create_task(self.controllers_turn_heating_on())
         await self.chain_execute(chain_list)
         print("Оставили лопатку в печи", time.time())
         if self.status != "failed_to_be_cooked":
-            await args[0].immediately_executed_queue.put(self.controllers_bake)
+            asyncio.create_task(self.controllers_bake())
         print("ЗАКОНЧИЛИ С БЛЮДОМ", time.time())
         print("СТАТУС блюда после доставки лопатки в печь", self.status)
         print(self.is_dish_ready)
@@ -408,14 +408,11 @@ class Recipy(ConfigMixin):
             # self.oven_future = self.set_oven_timer()
             # print("СТАТУС БЛЮДА", self.status)
 
-    async def make_crust(self):
-        """Этот метод делает корочку на пицце"""
-        print("Начинаем делать корочку", time.time())
-
     def create_dish_recipe(self):
         """создает рецепт блюда"""
         dish_recipe = [self.chain_get_dough_and_sauce]
         for filling_item in self.filling.filling_content:
+            print(filling_item)
             dish_recipe.append((self.get_filling_chain, filling_item))
         dish_recipe.append(self.bring_vane_to_oven)
         return dish_recipe

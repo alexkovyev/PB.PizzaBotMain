@@ -62,12 +62,20 @@ class CookingMode(BaseMode):
     def __init__(self, recipes):
         self.recipes = recipes
         self.current_orders_proceed = {}
-        self.is_free = False
         # разные полезные очереди
-        self.main_queue = asyncio.Queue()
+        self.cooking_queue = asyncio.Queue()
         self.delivery_queue = asyncio.Queue()
         self.maintain_queue = asyncio.Queue()
-        self.immediately_executed_queue = asyncio.Queue()
+        # self.immediately_executed_queue = asyncio.Queue()
+
+    @property
+    def is_downtime(self):
+        """Проверяет можно ли танцеать, те все очереди пустые"""
+        if not all(
+                map(lambda p: p.empty(), (self.cooking_queue, self.maintain_queue, self.delivery_queue))):
+            return False
+        else:
+            return True
 
     async def checking_order_for_double(self, new_order_id):
         """Этот метод проверяет есть ли уже заказ с таким ref id в обработке
@@ -186,7 +194,7 @@ class CookingMode(BaseMode):
             dish["filling"]["make_crust_program"] = self.recipes["filling"][filling_id]["make_crust_program"][dough_id]
             dish["filling"]["pre_heating_program"] = self.recipes["filling"][filling_id]["pre_heating_program"][dough_id]
             dish["filling"]["stand_by"] = self.recipes["filling"][filling_id]["stand_by_program"][dough_id]
-            dish["filling"]["chain"] = self.recipes["filling"][filling_id]["chain"]
+            # dish["filling"]["chain"] = self.recipes["filling"][filling_id]["chain"]
             halfstaff_content = dish["filling"]["content"]
             cutting_program = self.recipes["filling"][filling_id]["cutting_program"]
             dish["filling"]["content"] = [list(_) for _ in (zip(halfstaff_content, cutting_program))]
@@ -213,6 +221,11 @@ class CookingMode(BaseMode):
             await self.get_recipe_data(order_content["dishes"])
             # резервируем печи для заказа (сразу 2 шт)
             ovens_reserved = await self.reserve_oven(order_content, oven_data)
+            print(ovens_reserved, "Это в моде")
+            # ['83ee75a8-2d45-43f5-baeb-2f019c29b87c', '2d5c5696-f7ef-45fe-a3fd-88350c4fd706']
+            # Это
+            # в
+            # моде
             # создаем экземпляр класса заказа
             order = BaseOrder(order_content, ovens_reserved)
             if order:
@@ -220,7 +233,7 @@ class CookingMode(BaseMode):
                 self.current_orders_proceed[order.ref_id] = order
                 print(self.current_orders_proceed)
                 for dish in order.dishes:
-                    await self.put_chains_in_queue(dish)
+                    await self.put_chains_in_queue(dish, self.cooking_queue)
                 await order.create_is_order_ready_monitoring()
                 asyncio.create_task(order.order_readiness_monitoring())
 
@@ -228,77 +241,37 @@ class CookingMode(BaseMode):
         except ValueError:
             pass
 
-    async def put_chains_in_queue(self, dish):
-        """Добавляет чейны рецепта в очередь готовки в виде кортежа (dish, chain)"""
+    async def put_chains_in_queue(self, dish, queue):
+        """Добавляет чейны рецепта в очередь в виде кортежа (dish, chain)"""
         chains = dish.chain_list
         for chain in chains:
-            await self.main_queue.put((dish, chain))
-        self.is_free = False
+            await queue.put(chain)
 
-    def check_if_free(self):
-        """Проверяет можно ли танцеать, те все очереди пустые"""
-        if not all(
-                map(lambda p: p.empty(), (self.main_queue, self.maintain_queue, self.delivery_queue))):
-            self.is_free = False
-        else:
-            self.is_free = True
-        print("Можно ли танцевать? ", self.is_free)
-        return self.is_free
-
-    async def cooking_immediately_execute(self):
-        while True:
-            while not self.immediately_executed_queue.empty():
-                print("В срочной очереди появился чейн", time.time())
-                print("Размер очереди", self.immediately_executed_queue.qsize())
-                chain_to_do = await self.immediately_executed_queue.get()
-                if isinstance(chain_to_do, tuple):
-                    task, params = chain_to_do
-                    print("Сработал ПЕРВЫЙ путь В срочной очереди", task, type(chain_to_do), time.time())
-                    await asyncio.create_task(task(params))
-                if isinstance(chain_to_do, types.MethodType):
-                    print("Сработал ВТОРОЙ В срочной очереди", type(chain_to_do), chain_to_do, time.time())
-                    await asyncio.create_task(chain_to_do())
-            await asyncio.sleep(0.5)
-
-    async def choose_what_to_do(self):
-        if not self.delivery_queue.empty():
-            print("Выдаем заказ")
-            chain = await self.delivery_queue.get()
-            return chain
-
+    async def unpack_chain_data(self, queue, params=None):
+        print("Начинаем распаковку")
+        chain_to_do = await queue.get()
+        if isinstance(chain_to_do, tuple):
+            chain_to_do, params = chain_to_do
+        if chain_to_do.__self__.status != self.STOP_STATUS:
+            print("Готовим блюдо", chain_to_do.__self__.id)
+            print(chain_to_do.__self__.oven_unit)
+            await chain_to_do(params, self)
 
     async def cooking(self):
         """Эта курутина обеспеивает вызов методов по приготовлению блюд и другой важной работе"""
 
         while True:
             print("Работает cooking", time.time())
-
-            self.is_free = self.check_if_free()
-            if self.is_free:
-                print("Танцуем")
+            if self.is_downtime:
+                print("Танцуем, других заданий нет")
                 await RA.dance()
             else:
                 if not self.delivery_queue.empty():
                     print("Выдаем заказ")
                     await self.delivery_queue.get()
-                    await asyncio.sleep(5)
-                elif not self.main_queue.empty():
+                elif not self.cooking_queue.empty():
                     print("Вернулись в очередь main")
-                    dish, chain_to_do = await self.main_queue.get()
-                    if dish.status != self.STOP_STATUS:
-                        print("Готовим блюдо", dish.id)
-                        if isinstance(chain_to_do, tuple):
-                            chain, params = chain_to_do
-                            _, cutting_program, storage_adress = params
-                            print("Начинаем готовить", _.upper())
-                            # await chain(dish, storage_adress, cutting_program)
-                            await chain(storage_adress, cutting_program, self)
-                        else:
-                            # await chain_to_do(dish)
-                            await chain_to_do(self)
-                    else:
-                        continue
-
+                    await self.unpack_chain_data(self.cooking_queue)
                 elif not self.maintain_queue.empty():
                     print("Моем или выкидываем пиццу")
 
@@ -309,7 +282,6 @@ class CookingMode(BaseMode):
                        "failed_to_be_cooked", "not_delivered"]
        добавить статус "time_is_up"
        """
-
 
     async def qr_code_handler(self, params):
         """Этот метод проверяет, есть ли заказ с таким чек кодом в current_orders_proceed.
