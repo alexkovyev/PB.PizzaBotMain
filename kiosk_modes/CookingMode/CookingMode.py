@@ -207,6 +207,11 @@ class CookingMode(BaseMode):
             dish["additive"]["recipe"] = self.recipes["additive"]
 
     async def reserve_oven(self, new_order, oven_data):
+        """
+        :param new_order:
+        :param oven_data: объект класса Oven
+        :return:
+        """
         print("Это блюда в заказе", new_order, oven_data)
         ovens_reserved = [oven_data.oven_reserve(dish) for dish in new_order["dishes"]]
         return ovens_reserved
@@ -223,9 +228,6 @@ class CookingMode(BaseMode):
             ovens_reserved = await self.reserve_oven(order_content, oven_data)
             print(ovens_reserved, "Это в моде")
             # ['83ee75a8-2d45-43f5-baeb-2f019c29b87c', '2d5c5696-f7ef-45fe-a3fd-88350c4fd706']
-            # Это
-            # в
-            # моде
             # создаем экземпляр класса заказа
             order = BaseOrder(order_content, ovens_reserved)
             if order:

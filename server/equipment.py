@@ -34,7 +34,9 @@ class Equipment(object):
 class Oven(object):
     def __init__(self, ovens_data):
         # self.oven_units = ovens_data
+        # {'e0714152-182a-4da0-9d06-5190ad44d919': <server.equipment.OvenUnit object at 0x03C74D60>}
         self.oven_units = {i: OvenUnit(ovens_data[i]) for i in ovens_data}
+        print("Это объекты печи юниты", self.oven_units)
 
     # def fetch_free_oven_list(self):
     #     """Этот метод получает список печей со статусом свободны"""
@@ -45,6 +47,7 @@ class Oven(object):
         """Этот метод получает список печей со статусом свободны"""
         free_oven = [oven for oven in self.oven_units.values() if oven.status == "free"]
         # тут список объектов
+        # [ < server.equipment.OvenUnit object at 0x03C74D60 >, < server.equipment.OvenUnit object at0x03C74928 >]
         print("Это свободная печь", free_oven)
         return free_oven
 
@@ -92,9 +95,12 @@ class Oven(object):
     def oven_reserve(self, dish_id):
         oven_id = self.get_first_free_oven()
         self.oven_units[oven_id].status = "reserved"
+        print(self.oven_units[oven_id].status)
         self.oven_units[oven_id].dish = dish_id
         print("Статус изменен")
-        return oven_id
+        # return oven_id
+        print("Возвращаем объект, а не номер печи", self.oven_units[oven_id])
+        return self.oven_units[oven_id]
 
     # async def oven_broke_handler(self, event_data):
     #     """Это группа функций обрабатывает поломку печи.
@@ -136,3 +142,8 @@ class OvenUnit(object):
         self.oven_id = oven_data["oven_id"]
         self.status = oven_data["status"]
         self.dish = None
+        self.stop_baking_time = None
+        self.dish_liquidation_time = None
+
+    def __repr__(self):
+        return f"Печь № {self.oven_id}"

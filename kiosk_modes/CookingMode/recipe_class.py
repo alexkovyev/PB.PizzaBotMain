@@ -133,7 +133,7 @@ class Recipy(ConfigMixin):
     async def controllers_oven(self, oven_mode, recipe):
         time_changes = asyncio.get_running_loop().create_future()
         await self.time_changes_handler(time_changes)
-        operation_results = await Controllers.start_baking(self.oven_unit, oven_mode, recipe, time_changes)
+        operation_results = await Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes)
         return operation_results
 
     async def controllers_cut_half_staff(self, cutting_program):
@@ -191,11 +191,17 @@ class Recipy(ConfigMixin):
         if is_need_to_change_gripper:
             await self.move_to_object((self.CAPTURE_STATION, None))
             while current_gripper != required_gripper:
+                print("ТРЕБУЕМЫЙ захват", required_gripper)
+                print("ТЕКУЩИЙ захват", current_gripper)
                 if current_gripper is not None:
                     await self.atomic_chain_execute({"place": "gripper_unit", "name": "set_gripper"})
                     await self.atomic_chain_execute({"place": "gripper_unit", "name": "get_gripper"})
+                    # Потом удалить
+                    current_gripper = required_gripper
                 else:
                     await self.atomic_chain_execute({"place": "gripper_unit", "name": "get_gripper"})
+                    # Потом удалить
+                    current_gripper = required_gripper
 
     async def get_vane_from_oven(self, *args):
         """Этот метод запускает группу атомарных действий RA по захвату лопатки из печи"""
@@ -387,6 +393,7 @@ class Recipy(ConfigMixin):
     async def controllers_turn_heating_on(self):
         """Метод запускает прогрев печи"""
         print("Начинаем прогрев печи", time.time())
+
         oven_mode = "pre_heating"
         recipe = self.pre_heating_program
         operation_result = await self.controllers_oven(oven_mode, recipe)
@@ -394,7 +401,7 @@ class Recipy(ConfigMixin):
 
     async def controllers_bake(self, *args):
         """Метод запускает выпечку"""
-        print("Начинаем прогрев печи", time.time())
+        print("Начинаем выпечку", time.time())
         oven_mode = "baking"
         recipe = self.baking_program
         self.status = "baking"

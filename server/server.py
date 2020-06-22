@@ -76,7 +76,7 @@ class PizzaBotMain(object):
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
         # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='0', minute=23, second=30)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='11', minute=2, second=30)
         return scheduler
 
     def get_config_data(self):
