@@ -291,9 +291,13 @@ class Recipy(ConfigMixin):
             self.oven_future.set_result("time is over")
             await self.throwing_dish_away(self.oven_unit)
 
-    async def time_changes_handler(self, time_futura, *args):
+    async def time_changes_handler(self, time_futura, is_limit_factor = None,  *args):
         """Обрабатывает результаты футуры об изменении времени выпечки"""
         print(time_futura, time.time())
+
+        if is_limit_factor:
+            time_limit = time.time() - int(time_futura[self.id])
+            await self.find_what_to_do(time_limit)
 
     # средняя укрупненность, так как операция с лимитом по времени от контроллеров
     async def bring_half_staff(self, cell_location_tuple, *args):
@@ -422,6 +426,20 @@ class Recipy(ConfigMixin):
             dish_recipe.append((self.get_filling_chain, filling_item))
         dish_recipe.append(self.bring_vane_to_oven)
         return dish_recipe
+
+    async def make_crust(self):
+        print("Начинаем разогрев пиццы")
+        oven_mode = "make_crust"
+        recipe = self.make_crust_program
+        time_changes = asyncio.get_running_loop().create_future()
+        is_limit_factor = True
+        await self.time_changes_handler((time_changes, is_limit_factor))
+        operation_results = await Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes)
+        return operation_results
+
+    async def find_what_to_do(self):
+        pass
+
 
     async def create_dish_delivery_recipe(self):
         print("Начинаем упаковку пиццы")

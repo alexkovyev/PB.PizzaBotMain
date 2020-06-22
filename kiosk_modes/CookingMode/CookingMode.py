@@ -61,6 +61,7 @@ class CookingMode(BaseMode):
     def __init__(self, recipes):
         self.recipes = recipes
         self.current_orders_proceed = {}
+        self.orders_requested_for_delivery = {}
         # разные полезные очереди
         self.cooking_queue = asyncio.Queue()
         self.delivery_queue = asyncio.Queue()
@@ -296,6 +297,7 @@ class CookingMode(BaseMode):
         if set_mode_param == "ready":
             # нужно ли промежуточное звено?
             self.orders_requested_for_delivery[order_check_code] = order_check_code
+            asyncio.create_task(self.delivery_request_handler(order_check_code))
             self.current_orders_proceed[order_check_code].pickup_point = pickup_point
         await Controllers.set_pickup_point_mode(set_mode_param, pickup_point)
         # await self.delivery_queue.put(qr_code_data)
@@ -328,4 +330,4 @@ class CookingMode(BaseMode):
     async def delivery_request_handler(self, order_check_code):
         """Запускает процедуру выдачи заказа"""
         for dish in self.current_orders_proceed[order_check_code].dishes:
-            pass
+            print("Вот это блюдо выдаем",dish)
