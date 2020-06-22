@@ -2,7 +2,6 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import time
-import types
 
 from functools import partial
 
@@ -66,7 +65,6 @@ class CookingMode(BaseMode):
         self.cooking_queue = asyncio.Queue()
         self.delivery_queue = asyncio.Queue()
         self.maintain_queue = asyncio.Queue()
-        # self.immediately_executed_queue = asyncio.Queue()
 
     @property
     def is_downtime(self):
@@ -226,21 +224,21 @@ class CookingMode(BaseMode):
             await self.get_recipe_data(order_content["dishes"])
             # резервируем печи для заказа (сразу 2 шт)
             ovens_reserved = await self.reserve_oven(order_content, oven_data)
-            print(ovens_reserved, "Это в моде")
-            # ['83ee75a8-2d45-43f5-baeb-2f019c29b87c', '2d5c5696-f7ef-45fe-a3fd-88350c4fd706']
-            # создаем экземпляр класса заказа
             order = BaseOrder(order_content, ovens_reserved)
             if order:
                 # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
+                # и в словарь неготовых заказов
                 self.current_orders_proceed[order.ref_id] = order
                 print(self.current_orders_proceed)
                 for dish in order.dishes:
+                    await dish.half_staff_cell_evaluation()
                     await self.put_chains_in_queue(dish, self.cooking_queue)
                 await order.create_is_order_ready_monitoring()
                 asyncio.create_task(order.order_readiness_monitoring())
 
         # придумать ошибки какие могут быть
         except ValueError:
+            # добавить повтор при неуспешном подключении к БД или если печей нет
             pass
 
     async def put_chains_in_queue(self, dish, queue):

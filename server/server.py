@@ -52,9 +52,7 @@ class PizzaBotMain(object):
                     is_it_new_order = await self.current_instance.checking_order_for_double(new_order_id)
                     print("Это новый заказ")
                     if is_it_new_order:
-                        print("В этом ифе")
                         print(self.current_instance.create_new_order)
-                        print(self.equipment.oven_available)
                         await asyncio.create_task(self.current_instance.create_new_order(new_order_id,
                                                                                    self.equipment.oven_available))
                         message = "Заказ успешно принят"

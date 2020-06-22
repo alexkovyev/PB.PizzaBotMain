@@ -405,7 +405,6 @@ class Recipy(ConfigMixin):
         oven_mode = "baking"
         recipe = self.baking_program
         self.status = "baking"
-        print("Это аргс", args)
         operation_result = await self.controllers_oven(oven_mode, recipe)
         if operation_result:
             self.is_dish_ready.set()

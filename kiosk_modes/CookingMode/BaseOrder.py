@@ -116,6 +116,10 @@ class BaseDish(Recipy):
         self.pickup_point_unit: int
         self.is_dish_ready = None
 
+    async def half_staff_cell_evaluation(self):
+        """Этот метод назначает п\ф из БД"""
+        pass
+
     def __repr__(self):
         return f"Блюдо {self.id} состоит из {self.dough}, {self.sauce}, {self.filling}, {self.additive}  " \
                f"\"Зарезервирована печь\" {self.oven_unit} Статус {self.status}"
