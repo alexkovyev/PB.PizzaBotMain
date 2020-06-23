@@ -103,7 +103,7 @@ class BaseDish(Recipy):
         self.additive = BaseAdditive(dish_data["additive"])
 
         self.oven_unit = free_oven_id
-        print("Это печь в блюде", self.oven_unit)
+        print("Это печь в блюде (объект)", self.oven_unit)
         self.status = "received"
         self.chain_list = self.create_dish_recipe()
         self.delivery_chain_list = self.create_dish_delivery_recipe()

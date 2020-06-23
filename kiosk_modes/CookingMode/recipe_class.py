@@ -274,31 +274,6 @@ class Recipy(ConfigMixin):
         }
         await self.atomic_chain_execute(atomic_params)
 
-    async def set_oven_timer(self, *args):
-        print("!!!!!!!!!!ставим таймер на печь", time.time())
-        oven_future = asyncio.get_running_loop().create_future()
-        self.oven_future = oven_future
-        await asyncio.create_task(self.oven_timer())
-
-    async def oven_timer(self, *args):
-        print("!!!!!!!!!!!!Начинаем ждать первый интервал", time.time())
-        print("Статус печи", self.oven_unit)
-        # args[o].equipment[]
-        await asyncio.sleep(OVEN_LIQUIDATION_TIME)
-        print("!!!!!!!!!!! время сна завершено",time.time())
-        if not self.oven_future.cancelled():
-            print("!!!!!!!!!!!!!!Футура закончилась, блюдо не забрали")
-            self.oven_future.set_result("time is over")
-            await self.throwing_dish_away(self.oven_unit)
-
-    async def time_changes_handler(self, time_futura, is_limit_factor = None,  *args):
-        """Обрабатывает результаты футуры об изменении времени выпечки"""
-        print(time_futura, time.time())
-
-        if is_limit_factor:
-            time_limit = time.time() - int(time_futura[self.id])
-            await self.find_what_to_do(time_limit)
-
     # средняя укрупненность, так как операция с лимитом по времени от контроллеров
     async def bring_half_staff(self, cell_location_tuple, *args):
         print("Начинаем везти продукт")
@@ -415,8 +390,39 @@ class Recipy(ConfigMixin):
             print("БЛЮДО ГОТОВО")
             self.status = "ready"
             print("Это результат установки", self.is_dish_ready.is_set())
-            # self.oven_future = self.set_oven_timer()
-            # print("СТАТУС БЛЮДА", self.status)
+            await self.set_oven_timer()
+
+    async def set_oven_timer(self, *args):
+        print("!!!!!!!!!!ставим таймер на печь", time.time())
+        oven_future = asyncio.get_running_loop().create_future()
+        self.oven_future = oven_future
+        self.oven_unit.dish_waiting_time = time.time() + OVEN_FREE_WAITING_TIME
+        await asyncio.create_task(self.oven_timer())
+
+    async def oven_timer(self, *args):
+        """args пустые"""
+        print("!!!!!!!!!!!!Начинаем ждать первый интервал", time.time())
+        print("Статус печи", self.oven_unit.status)
+        self.oven_unit.status = "waiting_15"
+        await asyncio.sleep(OVEN_FREE_WAITING_TIME)
+        print("!!!!!!!!!!! время первого сна завершено",time.time())
+        if not self.oven_future.cancelled():
+            print("!!!!!!!!!!!!!!блюдо не забрали, запускаем 60 сек")
+            self.oven_unit.status = "waiting_60"
+            await asyncio.sleep(OVEN_LIQUIDATION_TIME)
+            if not self.oven_future.cancelled():
+                print("!!!!!!!!!!!!!!блюдо не забрали, запускаем чистку")
+                self.oven_future.set_result("time is over")
+                self.oven_unit.status = "cleaning"
+                await self.throwing_dish_away(self.oven_unit)
+
+    async def time_changes_handler(self, time_futura, is_limit_factor = None,  *args):
+        """Обрабатывает результаты футуры об изменении времени выпечки"""
+        print(time_futura, time.time())
+
+        if is_limit_factor:
+            time_limit = time.time() - int(time_futura[self.id])
+            await self.find_what_to_do(time_limit)
 
     def create_dish_recipe(self):
         """создает рецепт блюда"""
@@ -440,7 +446,6 @@ class Recipy(ConfigMixin):
     async def find_what_to_do(self):
         pass
 
-
     async def create_dish_delivery_recipe(self):
         print("Начинаем упаковку пиццы")
         chain_list = [(self.change_gripper, "None"),
@@ -459,7 +464,7 @@ class Recipy(ConfigMixin):
         print("Закончили упаковку и выдачу пиццы")
 
     async def throwing_dish_away(self, oven_unit):
-        print("Запускаем выбрасывание блюда")
+        print("Запускаем выбрасывание блюда", time.time())
         chain_list = [(self.change_gripper, "None"),
                       (self.move_to_object, (oven_unit, None)),
                       (self.get_vane_from_oven, None),
@@ -467,4 +472,5 @@ class Recipy(ConfigMixin):
                       (self.move_to_object, (oven_unit, None)),
         ]
         await self.chain_execute(chain_list)
+        oven_unit.status = "free"
         print("Закончили выбрасывание блюда")

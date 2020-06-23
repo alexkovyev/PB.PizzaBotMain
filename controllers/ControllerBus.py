@@ -161,8 +161,8 @@ class Controllers(Movement):
             time_changes_requset.set_result({oven_unit: (time.time() + 10)})
             await asyncio.sleep(10)
         else:
-            time_changes_requset.set_result({oven_unit: (time.time() + 180)})
-            await asyncio.sleep(180)
+            time_changes_requset.set_result({oven_unit: (time.time() + 60)})
+            await asyncio.sleep(60)
         result = True
         print("контроллеры закончили", oven_mode, time.time())
         return result

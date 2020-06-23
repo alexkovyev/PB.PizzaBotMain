@@ -143,6 +143,7 @@ class OvenUnit(object):
         self.status = oven_data["status"]
         self.dish = None
         self.stop_baking_time = None
+        self.dish_waiting_time = None
         self.dish_liquidation_time = None
 
     def __repr__(self):
