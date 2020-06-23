@@ -96,7 +96,7 @@ class Oven(object):
         dish_in_broken_oven = self.oven_units[oven_id].dish
         if oven_status == "reserved":
             print("Нужно переназначить печь")
-            # может быть, что печей свободных нет
+            # может быть, что печей свободных нет. Добавитьь обработку
             new_oven_id = self.get_first_free_oven()
             print("Перезначаем блюдо", self.oven_units[oven_id].dish)
             self.oven_units[new_oven_id].dish = dish_in_broken_oven
