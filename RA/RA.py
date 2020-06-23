@@ -35,7 +35,7 @@ class RA(Movement):
            to_place: srt
         :return: possible_duration (list[int])
         """
-        result_choice = random.choice([[5, 6, 9, 2, 1], [4, 5, 6, 8, 10], [9, 5, 6, 3, 1]])
+        result_choice = random.choice([[5, 6, 3, 2, 1], [4, 5, 6, 3, 1], [4, 5, 6, 3, 1]])
         return result_choice
 
     @classmethod

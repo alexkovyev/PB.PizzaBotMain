@@ -39,7 +39,6 @@ class ControllersEvents(Dispatcher):
 
 
 cntrls_events = ControllersEvents()
-print(isinstance(cntrls_events, ControllersEvents ))
 
 
 async def event_generator(cntrls_events):
@@ -98,7 +97,7 @@ class Movement(object):
 
     @staticmethod
     async def movement(*args):
-        n = random.randint(2, 10)
+        n = random.randint(2, 5)
         print("-- Время работы контроллеров", n)
         await asyncio.sleep(n)
         result = random.choice([True, True, True])

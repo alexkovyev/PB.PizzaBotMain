@@ -53,8 +53,7 @@ class PizzaBotMain(object):
                     print("Это новый заказ")
                     if is_it_new_order:
                         print(self.current_instance.create_new_order)
-                        await asyncio.create_task(self.current_instance.create_new_order(new_order_id,
-                                                                                   self.equipment.oven_available))
+                        await asyncio.create_task(self.current_instance.create_new_order(new_order_id))
                         message = "Заказ успешно принят"
                         raise web.HTTPCreated(text=message)
                     else:
@@ -74,7 +73,7 @@ class PizzaBotMain(object):
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
         # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='11', minute=43, second=0)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='12', minute=31, second=30)
         return scheduler
 
     def get_config_data(self):
@@ -126,7 +125,7 @@ class PizzaBotMain(object):
                 print("ОШИБКА ОБОРУДОВАНИЯ")
                 self.equipment = await self.add_equipment_data()
             (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
-            self.current_instance = CookingMode.CookingMode(recipe)
+            self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
             self.kiosk_status = "cooking"
             await self.current_instance.cooking()
         elif self.kiosk_status == "testing_mode":
@@ -151,13 +150,8 @@ class PizzaBotMain(object):
         while True:
             event_data = await event
             _, new_data = event_data
-            await self.hardware_broke_handler(new_data)
-
-    async def hardware_broke_handler(self, event_data):
-        print("Обрабатываем уведомление об поломке оборудования", time.time())
-        oven_id = int(event_data["unit_name"])
-        oven_status = event_data["status"]
-        print("Обработали", oven_id, oven_status)
+            # тут добавить, что делать если не печи и ниже только для обработки поломки печи
+            await self.current_instance.broken_equipment_handler(new_data)
 
     async def create_tasks(self, app, scheduler):
         runner = web.AppRunner(app)

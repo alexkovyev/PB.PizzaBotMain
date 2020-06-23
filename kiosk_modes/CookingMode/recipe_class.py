@@ -409,6 +409,7 @@ class Recipy(ConfigMixin):
         if not self.oven_future.cancelled():
             print("!!!!!!!!!!!!!!блюдо не забрали, запускаем 60 сек")
             self.oven_unit.status = "waiting_60"
+            self.oven_unit.dish_waiting_time = time.time() + OVEN_LIQUIDATION_TIME
             await asyncio.sleep(OVEN_LIQUIDATION_TIME)
             if not self.oven_future.cancelled():
                 print("!!!!!!!!!!!!!!блюдо не забрали, запускаем чистку")
@@ -473,4 +474,5 @@ class Recipy(ConfigMixin):
         ]
         await self.chain_execute(chain_list)
         oven_unit.status = "free"
+        oven_unit.dish = None
         print("Закончили выбрасывание блюда")

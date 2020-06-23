@@ -2,6 +2,7 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import time
+import random
 
 from functools import partial
 
@@ -58,8 +59,9 @@ class BeforeCooking(object):
 class CookingMode(BaseMode):
     STOP_STATUS = "failed_to_be_cooked"
 
-    def __init__(self, recipes):
+    def __init__(self, recipes, equipment):
         self.recipes = recipes
+        self.equipment = equipment
         self.current_orders_proceed = {}
         self.orders_requested_for_delivery = {}
         # разные полезные очереди
@@ -205,17 +207,17 @@ class CookingMode(BaseMode):
             await create_filling_recipe(self, dish)
             dish["additive"]["recipe"] = self.recipes["additive"]
 
-    async def reserve_oven(self, new_order, oven_data):
+    async def reserve_oven(self, new_order):
         """
         :param new_order:
         :param oven_data: объект класса Oven
         :return:
         """
-        print("Это блюда в заказе", new_order, oven_data)
-        ovens_reserved = [oven_data.oven_reserve(dish) for dish in new_order["dishes"]]
+        print("Это блюда в заказе", new_order)
+        ovens_reserved = [self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
         return ovens_reserved
 
-    async def create_new_order(self, new_order, oven_data):
+    async def create_new_order(self, new_order):
         """Этот метод создает экземпляр класса Order и заносит его в словарь self.current_orders_proceed
         @:params:
         new_order - это словарь с блюдами, получаемый из БД в рамках метода get_order_content_from_db """
@@ -224,7 +226,7 @@ class CookingMode(BaseMode):
             order_content = await self.get_order_content_from_db(new_order)
             await self.get_recipe_data(order_content["dishes"])
             # резервируем печи для заказа (сразу 2 шт)
-            ovens_reserved = await self.reserve_oven(order_content, oven_data)
+            ovens_reserved = await self.reserve_oven(order_content)
             order = BaseOrder(order_content, ovens_reserved)
             if order:
                 # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
@@ -263,6 +265,7 @@ class CookingMode(BaseMode):
 
         while True:
             print("Работает cooking", time.time())
+            print(self.equipment.oven_available.oven_units)
             if self.is_downtime:
                 print("Танцуем, других заданий нет")
                 await RA.dance()
@@ -275,6 +278,16 @@ class CookingMode(BaseMode):
                     await self.unpack_chain_data(self.cooking_queue)
                 elif not self.maintain_queue.empty():
                     print("Моем или выкидываем пиццу")
+
+    async def broken_equipment_handler(self, event_data):
+        print("Обрабатываем уведомление об поломке оборудования", time.time())
+        oven_id = int(event_data["unit_name"])
+        oven_status = event_data["status"]
+        # начало симуляции работы
+        oven_id = random.choice(self.equipment.oven_available.oven_units.keys())
+        print("Сломалась печь", oven_id)
+        self.equipment.oven_available.broken_oven_handler(oven_id, self.current_orders_proceed)
+        print("Обработали", oven_id, oven_status)
 
     """Валиация qr кода
        входные данные: чек код заказа и номер пункта выдачи
@@ -328,6 +341,7 @@ class CookingMode(BaseMode):
         return set_mode
 
     async def delivery_request_handler(self, order_check_code):
-        """Запускает процедуру выдачи заказа"""
+        """Запускает процедуру выдачи заказа
+        ДОБАВИТЬ ОЧИСТКУ поля ПЕЧЬ после упаковке --> oven_unit = None"""
         for dish in self.current_orders_proceed[order_check_code].dishes:
             print("Вот это блюдо выдаем",dish)
