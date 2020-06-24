@@ -88,8 +88,17 @@ class BaseOrder(object):
 
 
 class BaseDish(Recipy):
-    """Этот класс представляет собой шаблон блюда в заказе."""
-    DISH_STATUSES = ["received", "cooking", "failed_to_be_cooked", "ready",
+    """Этот класс представляет собой шаблон блюда в заказе.
+    Расшифровка статусов блюда:
+    - received: блюдо получено, ждет в очереди
+    - cooking: лопатка достана из печи, идет готовка на любой стадии
+    - baking: пицца находится в печи на выпечке
+    - ready: пицца выпечена
+    - packing: начата упаковка
+    , "failed_to_be_cooked",
+                     "packed", "wait to delivery", "time_is_up"
+    """
+    DISH_STATUSES = ["received", "cooking", "baking", "failed_to_be_cooked", "ready",
                      "packed", "wait to delivery", "time_is_up"]
     STOP_STATUS = "failed_to_be_cooked"
 

@@ -205,14 +205,16 @@ class Recipy(ConfigMixin):
 
     async def get_vane_from_oven(self, *args):
         """Этот метод запускает группу атомарных действий RA по захвату лопатки из печи"""
+        oven = self.oven_unit
         atomic_params = {"name": "get_vane_from_oven",
-                          "place": self.oven_unit}
+                          "place": oven}
         await self.atomic_chain_execute(atomic_params)
 
     async def set_vane_in_oven(self, *args):
         """Этот метод запускает группу атомарных действий RA по размещению лопатки в печи"""
+        oven_id = self.oven_unit
         atomic_params = {"name": "set_shovel",
-                          "place": self.oven_unit}
+                          "place": oven_id}
         for arg in args:
             if arg == "heating":
                 asyncio.create_task(self.controllers_turn_heating_on())
@@ -444,9 +446,6 @@ class Recipy(ConfigMixin):
         operation_results = await Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes)
         return operation_results
 
-    async def find_what_to_do(self):
-        pass
-
     async def create_dish_delivery_recipe(self):
         print("Начинаем упаковку пиццы")
         chain_list = [(self.change_gripper, "None"),
@@ -476,3 +475,19 @@ class Recipy(ConfigMixin):
         oven_unit.status = "free"
         oven_unit.dish = None
         print("Закончили выбрасывание блюда")
+
+    async def switch_vanes(self, broken_oven_unit):
+        print("Запускаем смену лопаток между печами")
+        chain_list = [(self.move_to_object, (broken_oven_unit, None)),
+
+            (),
+        ]
+
+    async def switch_vane_cut_oven(self, new_oven_id, old_oven_id, *args):
+        print("Меняем лопатку между станцией нарезки и печью")
+        chain_list = [(self.move_to_object, (new_oven_id, None)),
+                      (self.get_vane_from_oven, new_oven_id),
+                      (self.move_to_object, (old_oven_id, None)),
+                      (self.set_vane_in_oven, old_oven_id)
+        ]
+        await self.chain_execute(chain_list)

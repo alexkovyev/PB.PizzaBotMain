@@ -208,10 +208,10 @@ class CookingMode(BaseMode):
             dish["additive"]["recipe"] = self.recipes["additive"]
 
     async def reserve_oven(self, new_order):
-        """
-        :param new_order:
+        """ Этот метод резервирует печи для каждого блюда в заказе
+        :param new_order: str
         :param oven_data: объект класса Oven
-        :return:
+        :return list of OvenUnit instance selected for the order
         """
         print("Это блюда в заказе", new_order)
         ovens_reserved = [self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
@@ -286,16 +286,46 @@ class CookingMode(BaseMode):
         # начало симуляции работы
         oven_id = random.choice(self.equipment.oven_available.oven_units.keys())
         print("Сломалась печь", oven_id)
-        self.equipment.oven_available.broken_oven_handler(oven_id, self.current_orders_proceed)
+        await self.broken_oven_handler(oven_id)
         print("Обработали", oven_id, oven_status)
 
-    """Валиация qr кода
-       входные данные: чек код заказа и номер пункта выдачи
-       выходные данные: сообщение контроллеру, запускается выдача заказа, если он готов, выдача подарка, если произошла ошибка
-       ORDER_STATUS = ["received", "cooking", "ready", "informed", "packed", "wait to delivery", "delivered", "closed",
-                       "failed_to_be_cooked", "not_delivered"]
-       добавить статус "time_is_up"
-       """
+    async def get_dish_status(self, dish_id):
+        for order in self.current_orders_proceed:
+            for dish in order:
+                if dish.id == dish_id:
+                    return dish.status
+
+    async def change_oven_in_dish(self, dish_id, current_orders_dict, new_oven):
+        for order in current_orders_dict:
+            for dish in order:
+                if dish.id == dish_id:
+                    dish.oven_unit = new_oven
+
+    async def broken_oven_handler(self, oven_id):
+        """ Этот метод обрабатывает поломку печи"""
+        print("Обрабатываем уведомление о поломке печи", oven_id)
+        BROKEN_STATUS = "broken"
+        ovens_list = self.equipment.oven_available.oven_units
+        oven_status = ovens_list[oven_id].status
+        dish_id_in_broken_oven = ovens_list[oven_id].dish
+        if oven_status == "reserved":
+            print("Печь забронирована, нужно переназначить печь")
+            await ovens_list.oven_reserve(dish_id_in_broken_oven).oven_id
+            ovens_list[oven_id].dish = None
+        elif oven_status == "occupied":
+            dish_status = await self.get_dish_status(dish_id_in_broken_oven)
+            broken_oven_id = oven_id
+            new_oven = await self.oven_reserve(dish_id_in_broken_oven)
+            # если выкидываем блюдо то печь не меняем
+            await self.change_oven_in_dish(dish_id_in_broken_oven, current_orders_dict, new_oven)
+            if dish_status == "cooking":
+                print("Запутить смену лопаток в высокий приоритет")
+            elif dish_status == "baking":
+                print("Запустить ликвидацю блюда")
+        oven_status = "broken"
+        print("Мы обработали печь")
+
+
 
     async def qr_code_handler(self, params):
         """Этот метод проверяет, есть ли заказ с таким чек кодом в current_orders_proceed.

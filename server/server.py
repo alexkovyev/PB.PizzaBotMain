@@ -53,7 +53,6 @@ class PizzaBotMain(object):
                     is_it_new_order = await self.current_instance.checking_order_for_double(new_order_id)
                     print("Это новый заказ")
                     if is_it_new_order:
-                        print(self.current_instance.create_new_order)
                         await asyncio.create_task(self.current_instance.create_new_order(new_order_id))
                         message = "Заказ успешно принят"
                         raise web.HTTPCreated(text=message)
@@ -74,7 +73,7 @@ class PizzaBotMain(object):
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
         # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='12', minute=31, second=30)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='22', minute=24, second=0)
         return scheduler
 
     def get_config_data(self):
