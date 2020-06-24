@@ -351,11 +351,11 @@ class Recipy(ConfigMixin):
         print("СТАНЦИЯ НАРЕЗКИ СВОБОДНА", self.is_cut_station_free.is_set())
         while not self.is_cut_station_free.is_set():
             try:
-                first_task_to_do = args[1].delivery_queue.get_nowait()
+                first_task_to_do = args[1].high_priority_queue.get_nowait()
             except asyncio.QueueEmpty:
                 print("Доставлять нечего, поработаем в другом месте")
             try:
-                task_to_do = args[1].maintain_queue.get_nowait()
+                task_to_do = args[1].low_priority_queue.get_nowait()
             except asyncio.QueueEmpty:
                 print("Мыть ничего не нужно, тоска")
             print("Танцеуем")
@@ -491,3 +491,4 @@ class Recipy(ConfigMixin):
                       (self.set_vane_in_oven, old_oven_id)
         ]
         await self.chain_execute(chain_list)
+        # что будет если неудачно?

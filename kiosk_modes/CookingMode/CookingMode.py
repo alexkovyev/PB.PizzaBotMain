@@ -9,8 +9,11 @@ from functools import partial
 from kiosk_modes.BaseMode import BaseMode
 from config.recipe_data import recipe_data
 from .BaseOrder import BaseOrder
+from .CookingModeErrors import OvenReserveFailed
+from server.custom_errors import OvenReservationError
 from RA.RA import RA
 from controllers.ControllerBus import Controllers
+from .recipe_class import Recipy
 
 
 class BeforeCooking(object):
@@ -65,15 +68,15 @@ class CookingMode(BaseMode):
         self.current_orders_proceed = {}
         self.orders_requested_for_delivery = {}
         # разные полезные очереди
-        self.cooking_queue = asyncio.Queue()
-        self.delivery_queue = asyncio.Queue()
-        self.maintain_queue = asyncio.Queue()
+        self.main_queue = asyncio.Queue()
+        self.high_priority_queue = asyncio.Queue()
+        self.low_priority_queue = asyncio.Queue()
 
     @property
     def is_downtime(self):
         """Проверяет можно ли танцеать, те все очереди пустые"""
         if not all(
-                map(lambda p: p.empty(), (self.cooking_queue, self.maintain_queue, self.delivery_queue))):
+                map(lambda p: p.empty(), (self.main_queue, self.low_priority_queue, self.high_priority_queue))):
             return False
         else:
             return True
@@ -214,35 +217,34 @@ class CookingMode(BaseMode):
         :return list of OvenUnit instance selected for the order
         """
         print("Это блюда в заказе", new_order)
-        ovens_reserved = [self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
-        return ovens_reserved
+        try:
+            ovens_reserved = [self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
+            return ovens_reserved
+        except OvenReservationError:
+            raise OvenReserveFailed("Ошибка назначения печей на заказ. Нет свободных печей")
 
     async def create_new_order(self, new_order):
         """Этот метод создает экземпляр класса Order и заносит его в словарь self.current_orders_proceed
         @:params:
         new_order - это словарь с блюдами, получаемый из БД в рамках метода get_order_content_from_db """
 
+        order_content = await self.get_order_content_from_db(new_order)
+        await self.get_recipe_data(order_content["dishes"])
+        # резервируем печи для заказа (сразу 2 шт)
         try:
-            order_content = await self.get_order_content_from_db(new_order)
-            await self.get_recipe_data(order_content["dishes"])
-            # резервируем печи для заказа (сразу 2 шт)
             ovens_reserved = await self.reserve_oven(order_content)
-            order = BaseOrder(order_content, ovens_reserved)
-            if order:
-                # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
-                # и в словарь неготовых заказов
-                self.current_orders_proceed[order.ref_id] = order
-                print(self.current_orders_proceed)
-                for dish in order.dishes:
-                    await dish.half_staff_cell_evaluation()
-                    await self.put_chains_in_queue(dish, self.cooking_queue)
-                await order.create_is_order_ready_monitoring()
-                asyncio.create_task(order.order_readiness_monitoring())
-
-        # придумать ошибки какие могут быть
-        except ValueError:
-            # добавить повтор при неуспешном подключении к БД или если печей нет
+        except OvenReserveFailed:
             pass
+        order = BaseOrder(order_content, ovens_reserved)
+        if order:
+            # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
+            self.current_orders_proceed[order.ref_id] = order
+            print(self.current_orders_proceed)
+            for dish in order.dishes:
+                await dish.half_staff_cell_evaluation()
+                await self.put_chains_in_queue(dish, self.main_queue)
+            await order.create_is_order_ready_monitoring()
+            asyncio.create_task(order.order_readiness_monitoring())
 
     async def put_chains_in_queue(self, dish, queue):
         """Добавляет чейны рецепта в очередь в виде кортежа (dish, chain)"""
@@ -270,13 +272,13 @@ class CookingMode(BaseMode):
                 print("Танцуем, других заданий нет")
                 await RA.dance()
             else:
-                if not self.delivery_queue.empty():
+                if not self.high_priority_queue.empty():
                     print("Выдаем заказ")
-                    await self.delivery_queue.get()
-                elif not self.cooking_queue.empty():
+                    await self.high_priority_queue.get()
+                elif not self.main_queue.empty():
                     print("Вернулись в очередь main")
-                    await self.unpack_chain_data(self.cooking_queue)
-                elif not self.maintain_queue.empty():
+                    await self.unpack_chain_data(self.main_queue)
+                elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
 
     async def broken_equipment_handler(self, event_data):
@@ -295,34 +297,37 @@ class CookingMode(BaseMode):
                 if dish.id == dish_id:
                     return dish.status
 
-    async def change_oven_in_dish(self, dish_id, current_orders_dict, new_oven):
-        for order in current_orders_dict:
+    async def change_oven_in_dish(self, dish_id, new_oven):
+        for order in self.current_orders_proceed:
             for dish in order:
                 if dish.id == dish_id:
                     dish.oven_unit = new_oven
 
-    async def broken_oven_handler(self, oven_id):
+    async def broken_oven_handler(self, broken_oven_id):
         """ Этот метод обрабатывает поломку печи"""
-        print("Обрабатываем уведомление о поломке печи", oven_id)
+        print("Обрабатываем уведомление о поломке печи", broken_oven_id)
         BROKEN_STATUS = "broken"
         ovens_list = self.equipment.oven_available.oven_units
-        oven_status = ovens_list[oven_id].status
-        dish_id_in_broken_oven = ovens_list[oven_id].dish
+        oven_status = ovens_list[broken_oven_id].status
+        dish_id_in_broken_oven = ovens_list[broken_oven_id].dish
+        new_oven_object = await ovens_list.oven_reserve(dish_id_in_broken_oven)
         if oven_status == "reserved":
-            print("Печь забронирована, нужно переназначить печь")
-            await ovens_list.oven_reserve(dish_id_in_broken_oven).oven_id
-            ovens_list[oven_id].dish = None
+            try:
+                print("Печь забронирована, нужно переназначить печь")
+                ovens_list[broken_oven_id].dish = None
+                await self.change_oven_in_dish(dish_id_in_broken_oven, new_oven_object)
+            except OvenReservationError:
+                pass
         elif oven_status == "occupied":
             dish_status = await self.get_dish_status(dish_id_in_broken_oven)
-            broken_oven_id = oven_id
-            new_oven = await self.oven_reserve(dish_id_in_broken_oven)
-            # если выкидываем блюдо то печь не меняем
-            await self.change_oven_in_dish(dish_id_in_broken_oven, current_orders_dict, new_oven)
+            await self.change_oven_in_dish(dish_id_in_broken_oven, new_oven_object)
             if dish_status == "cooking":
                 print("Запутить смену лопаток в высокий приоритет")
+                await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, new_oven_object.oven_id, broken_oven_id))
+                ovens_list[broken_oven_id].dish = None
             elif dish_status == "baking":
                 print("Запустить ликвидацю блюда")
-        oven_status = "broken"
+        oven_status = BROKEN_STATUS
         print("Мы обработали печь")
 
 
@@ -343,7 +348,7 @@ class CookingMode(BaseMode):
             asyncio.create_task(self.delivery_request_handler(order_check_code))
             self.current_orders_proceed[order_check_code].pickup_point = pickup_point
         await Controllers.set_pickup_point_mode(set_mode_param, pickup_point)
-        # await self.delivery_queue.put(qr_code_data)
+        # await self.high_priority_queue.put(qr_code_data)
 
     async def evaluation_status_to_set_mode(self, order_check_code):
         """Передает контроллу значение, на основании которого пользователю выводится информация о заказе

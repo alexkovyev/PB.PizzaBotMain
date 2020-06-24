@@ -2,7 +2,7 @@
 import asyncio
 import time
 
-from server.custom_errors import NoFreeOvenError
+from server.custom_errors import NoFreeOvenError, OvenReservationError
 
 
 class Equipment(object):
@@ -84,7 +84,7 @@ class Oven(object):
             oven_id = await self.select_oven_by_status(oven_status="free")
         except NoFreeOvenError:
             print("Какая то супер ошибка, печей нет! Работать не можем Перенесли на уровень выше")
-            raise NoFreeOvenError("Нет свободных печей, не можем работать")
+            raise OvenReservationError("Нет свободных печей, не можем работать")
         self.oven_units[oven_id].status = "reserved"
         self.oven_units[oven_id].dish = dish_id
         print("Статус печи изменен")
