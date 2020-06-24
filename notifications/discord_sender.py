@@ -9,7 +9,7 @@ class DiscordBotAccess(discord.Client):
     def __init__(self):
         self.token = DISCORD_TOKEN
         self.prefix = '!'
-        self.recievers = {
+        self.receivers = {
             "operator": {},
             "admin": {}
         }
@@ -18,12 +18,12 @@ class DiscordBotAccess(discord.Client):
                 'end_of_shelf_life': {
                     'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта "
                             "{halfstaff_name} при мин остатке {min_qt}.",
-                    'recievers': ('operator', 'admin')
+                    'receivers': ('operator', 'admin')
                 },
                 'out_of_stock': {
                     'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта {"
                             "halfstaff_name} при мин остатке {min_qt}.",
-                    'recievers': ('operator',)
+                    'receivers': ('operator',)
                 }
             },
         }
@@ -36,12 +36,12 @@ class DiscordBotAccess(discord.Client):
             if channel.type == discord.ChannelType.text:
                 name = channel.name
                 if name.find("operator") == 0:
-                    self.recievers["operator"][name] = channel.id
+                    self.receivers["operator"][name] = channel.id
                     print("Operator channel is got")
                 elif name.find("admin") == 0:
-                    self.recievers["admin"][name] = channel.id
+                    self.receivers["admin"][name] = channel.id
                     print("Admin channel is got")
-        print("Это получатели", self.recievers)
+        print("Это получатели", self.receivers)
         # await self.send("message", "dev", True)
 
     async def send_messages(self, message_code, data):
@@ -50,41 +50,35 @@ class DiscordBotAccess(discord.Client):
         A message code : string\n
         Data : a dictionary of data for message template"""
 
-        async def form_message(point_key, reciever, data):
-            channel_key = reciever + '_' + point_key
-            channel = self.get_channel(self.recievers[reciever][channel_key])
+        async def form_message(reciever, data):
+            # channel_key = reciever + '_' + point_key
+            channel_key = reciever
+            channel = self.get_channel(self.receivers[reciever][channel_key])
             await channel.send(self.bot_config['message_templates'][message_code]['text'].format(**data))
 
-        for receiver in self.bot_config['message_templates'][message_code]['recievers']:
+        for receiver in self.bot_config['message_templates'][message_code]['receivers']:
             print(f'Message is sending to {receiver}')
-            await form_message('dev', receiver, data)
+            await form_message(receiver, data)
             print('Message is sent')
 
-    async def send(self, client):
+    async def send(self):
         print("Работает discord отправитель")
-        # await client.wait_until_ready()
-        while client.is_ready:
+        await self.wait_until_ready()
+        while self.is_ready:
             print("приготовились отправлять")
             message_code = "out_of_stock"
             data = {'id': '1', 'address': 'here', 'halfstaff_name': 'пельмени', 'N': '3', 'min_qt': '1'}
             await self.send_messages(message_code, data)
         await asyncio.sleep(5)
 
-    async def start_working(self, client):
+    async def start_working(self):
         while True:
             print("Начинаем цикл отправки сообщения")
-            await self.send(client)
-
-
-
-class DiscordBotSender(object):
-
-    def __init__(self):
-        self.client = DiscordBotAccess()
-        self.token = DISCORD_TOKEN
+            await self.start(self.token)
+            await self.send()
 
     async def start_bot_sender(self):
         loop = asyncio.get_running_loop()
-        loop.create_task(self.client.start_working(self.client))
-        self.client.run(self.token)
+        loop.create_task(self.start_working())
+
 

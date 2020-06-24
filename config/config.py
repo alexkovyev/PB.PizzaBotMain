@@ -19,4 +19,5 @@ QT_DISH_PER_ORDER = 2
 
 HALF_STAFF_CHECK_TIME = 60
 
-DISCORD_TOKEN = "NzI1MDQ5NTc0NTQ4MzA4MDk5.XvJH_Q.CoVBjrrUsd4cBhMU73eAJ8kb_no"
+with open("config/bot_token.txt") as bot_token:
+    DISCORD_TOKEN = bot_token.read().strip()

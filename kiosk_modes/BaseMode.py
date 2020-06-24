@@ -4,7 +4,7 @@ class BaseMode(object):
         self.is_busy = False
         self.time_left = None
 
-    async def broken_equipment_handler(self):
+    async def broken_equipment_handler(self, *args):
         pass
 
     def is_ok_to_del(self):

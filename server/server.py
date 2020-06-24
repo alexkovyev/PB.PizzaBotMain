@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config.config import SERVER_HOST, SERVER_PORT
 from controllers.ControllerBus import ControllersEvents, event_generator
-from notifications.discord_sender import DiscordBotAccess, DiscordBotSender
+from notifications.discord_sender import DiscordBotAccess
 from server.equipment import Equipment
 from kiosk_modes.CookingMode import CookingMode
 from kiosk_modes import (StandByMode)
@@ -23,7 +23,7 @@ class PizzaBotMain(object):
         self.equipment = None
         self.cntrls_events = ControllersEvents()
         self.config = None
-        self.discord_bot = DiscordBotSender()
+        self.discord_bot = DiscordBotAccess()
 
     def create_server(self):
         app = web.Application()
@@ -165,11 +165,11 @@ class PizzaBotMain(object):
         on_start_tasks = asyncio.create_task(self.add_equipment_data())
         controllers_bus = asyncio.create_task(event_generator(self.cntrls_events))
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
-        discord_sender = asyncio.create_task(self.discord_bot.start_bot_sender())
+        # discord_sender = asyncio.create_task(self.discord_bot.start_bot_sender())
         test_task = asyncio.create_task(self.test_working())
         logging_task = asyncio.create_task(PBlogs.logging_task())
 
-        await asyncio.gather(controllers_bus, test_task, event_listener, discord_sender, logging_task,
+        await asyncio.gather(controllers_bus, test_task, event_listener, logging_task,
                              on_start_tasks)
 
     def start_server(self):
