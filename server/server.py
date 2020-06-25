@@ -1,3 +1,4 @@
+""" Этот модуль описывает http сервер и фоновые задачи, запускаемые на старте"""
 import asyncio
 from aiohttp import web
 import time
@@ -5,82 +6,108 @@ import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config.config import SERVER_HOST, SERVER_PORT
+from config.config import SERVER_HOST, SERVER_PORT, STANDBYMODE, COOKINGMODE, TESTINGMODE
 from controllers.ControllerBus import ControllersEvents, event_generator
-from notifications.discord_sender import DiscordBotAccess
 from server.equipment import Equipment
-from kiosk_modes.CookingMode import CookingMode
-from kiosk_modes import (StandByMode)
+from kiosk_state.CookingMode import CookingMode
+from kiosk_state import StandByMode
 from logs.logs import PBlogs
 
 
 class PizzaBotMain(object):
+    """ Это основной класс приложения, запускаемый при старте системы """
 
     def __init__(self):
-        self.kiosk_status = "stand_by"
-        self.is_kiosk_busy = False
+        self.current_state = STANDBYMODE
         self.current_instance = StandByMode.StandBy()
         self.equipment = None
-        self.cntrls_events = ControllersEvents()
-        self.config = None
-        self.discord_bot = DiscordBotAccess()
+        self.events_monitoring = ControllersEvents()
 
     def create_server(self):
+        """Этот метод создает приложение aiohttp сервера, а также привязывает routes api
+        для связи с внешними компонентами (админ панель и экран приема заказов)
+        :return: aiohttp server app instance
+        """
         app = web.Application()
         self.setup_routes(app)
         return app
 
+    def create_scheduler(self):
+        """Этот метод создает планровщик для запуска команд по расписанию"""
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='0', minute=17, second=20)
+        return scheduler
+
     def setup_routes(self, app):
+        """ Этот метод связывает доступные эндпоинты и обработчики
+        :param app: aiohttp server app instance
+        """
         app.add_routes([
             web.post("/api/new_order", self.new_order_handler),
-            web.get("/", self.hello),
             # все доступные команды
             # web.get("/api/commands", None),
             # web.post("/api/commands/cooking_mode", None)
         ])
 
-    async def hello(self, request):
-        return web.Response(text="Тут все работает")
-
     async def new_order_handler(self, request):
+        """Этот метод обрабатывает запросы приема новых заказов в зависимости от текущего режима киоска,
+        запускает создание нового заказа при необходимости.
+        """
         print("Получили запрос от SS на новый заказ", time.time())
-        if request.body_exists:
-            request_body = await request.json()
-            new_order_id = request_body["check_code"]
-            can_receive_new_order = await self.is_open_for_new_orders()
-            if can_receive_new_order:
-                try:
-                    is_it_new_order = await self.current_instance.checking_order_for_double(new_order_id)
-                    print("Это новый заказ")
-                    if is_it_new_order:
-                        await asyncio.create_task(self.current_instance.create_new_order(new_order_id))
-                        message = "Заказ успешно принят"
-                        raise web.HTTPCreated(text=message)
-                    else:
-                        message = "Этот заказ уже находится в обработке"
-                        raise web.HTTPOk(text=message)
-                except AttributeError as e:
-                    print("Не создан инстанс cooking mode или метод не найден")
-                    print(e)
-                    raise web.HTTPServerError(text="Ошибка века в сервере")
-            else:
-                message = "Заказы не принимаем, приходите завтра"
-                raise web.HTTPNotAcceptable(text=message)
-        else:
+        if not request.body_exists:
             raise web.HTTPNoContent
+        request_body = await request.json()
+        new_order_id = request_body["check_code"]
+        can_receive_new_order = await self.is_open_for_new_orders()
+        if can_receive_new_order:
+            try:
+                is_it_new_order = await self.current_instance.checking_order_for_double(new_order_id)
+                if is_it_new_order:
+                    await asyncio.create_task(self.current_instance.create_new_order(new_order_id))
+                    message = "Заказ успешно принят"
+                    raise web.HTTPCreated(text=message)
+                else:
+                    message = "Этот заказ уже находится в обработке"
+                    raise web.HTTPOk(text=message)
+            except AttributeError:
+                print("Не создан инстанс cooking mode или метод не найден")
+                raise web.HTTPServerError(text="Ошибка века в сервере")
+        else:
+            message = "Заказы не принимаем, приходите завтра"
+            raise web.HTTPNotAcceptable(text=message)
 
-    def create_scheduler(self):
-        scheduler = AsyncIOScheduler()
-        scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
-        # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='11', minute=20, second=30)
-        return scheduler
+    async def is_open_for_new_orders(self):
+        """Метод определяет можно ли принимать заказы"""
+        return True if self.current_state == COOKINGMODE else False
 
-    def get_config_data(self):
-        pass
+    async def turn_on_cooking_mode(self):
+        """Этот метод запускает режим готовки"""
+        if self.current_state == STANDBYMODE:
+            print("ЗАПУСКАЕМ режим ГОТОВКИ")
+            self.current_instance = CookingMode.BeforeCooking()
+            if self.equipment is None:
+                print("ОШИБКА ОБОРУДОВАНИЯ")
+                self.equipment = await self.add_equipment_data()
+            (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
+            self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
+            self.current_state = COOKINGMODE
+            await self.current_instance.cooking()
+        elif self.current_state == "testing_mode":
+            pass
+        print("Режим готовки активирован", self.current_state)
+
+    async def create_hardware_broke_listener(self):
+        """Этот метод запускает бесконечный таск, который отслеживает наступление событий
+         поломки оборудования"""
+        event_name = "hardware_status_changed"
+        event = self.events_monitoring.get_dispatcher_event(event_name)
+        while True:
+            event_occurrence = await event
+            _, event_params = event_occurrence
+            print("Сработало событие, обрабатываем")
+            await self.current_instance.broken_equipment_handler(event_params)
 
     async def get_equipment_data(self):
-        print("Подключаемся к БД за информацией", time.time())
         await asyncio.sleep(10)
         oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
         equipment_data = {
@@ -93,88 +120,42 @@ class PizzaBotMain(object):
                                  "ab5065e3-93aa-4313-869e-50a959458439": "ok",
                                  "28cc0239-2e35-4ccd-9fcd-be2155e4fcbe": "ok",
                                  "1b1af602-b70f-42a3-8b5d-3112dcf82c26": "ok",
-            },
+                                 },
             "dough_dispensers": {"ebf29d04-023c-4141-acbe-055a19a79afe": "ok",
                                  "2e84d0fd-a71f-4988-8eee-d0373c0bc609": "ok",
                                  "68ec7c16-f57b-43c0-b708-dfaea5c2e1dd": "ok",
                                  "75355f3c-bf05-405d-98af-f04bcba7d7e4": "ok",
                                  },
             "pick_up_points": {"1431f373-d036-4e0f-b059-70acd6bd18b9": "ok",
-                              "b7f96101-564f-4203-8109-014c94790978": "ok",
-                              "73b194e1-5926-45be-99ec-25e1021b96f7": "ok",
-            }
+                               "b7f96101-564f-4203-8109-014c94790978": "ok",
+                               "73b194e1-5926-45be-99ec-25e1021b96f7": "ok",
+                               }
         }
-        print("Получили данные из БД", time.time())
         return equipment_data
 
     async def add_equipment_data(self):
-        print("Начинаем собирать данные об оборудовании", time.time())
+        """Этот метод запускает сбор данных об оборудовании из БД и создает экземпляр класса Equipment"""
         equipment_data = await self.get_equipment_data()
         self.equipment = Equipment(equipment_data)
-        print("Закончили собирать данные об оборудовании", time.time())
 
-    async def is_open_for_new_orders(self):
-        return True if self.kiosk_status == "cooking" else False
-
-    async def turn_on_cooking_mode(self):
-        """Включить можно только после завершения тестов"""
-        if self.kiosk_status == "stand_by":
-            print("ЗАПУСКАЕМ режим ГОТОВКИ")
-            self.current_instance = CookingMode.BeforeCooking()
-            if self.equipment is None:
-                print("ОШИБКА ОБОРУДОВАНИЯ")
-                self.equipment = await self.add_equipment_data()
-            (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
-            self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
-            self.kiosk_status = "cooking"
-            await self.current_instance.cooking()
-        elif self.kiosk_status == "testing_mode":
-            pass
-        elif self.kiosk_status == "cooking":
-            pass
-        print("Режим готовки активирован", self.kiosk_status)
-
-    async def test_working(self):
-        while True:
-            print("запускается фоновая задача", time.time())
-            print("Текущий режим", self.current_instance)
-            await asyncio.sleep(5)
-            print("фоновая задача отработала", time.time())
-
-    async def test_scheduler(self):
-        print("Привет из расписания", time.time())
-
-    async def create_hardware_broke_listener(self):
-        event_name = "hardware_status_changed"
-        event = self.cntrls_events.get_dispatcher_event(event_name)
-        while True:
-            event_data = await event
-            _, new_data = event_data
-            # тут добавить, что делать если не печи и ниже только для обработки поломки печи
-            print("Сработало событие, обрабатываем")
-            await self.current_instance.broken_equipment_handler(new_data)
-
-    async def create_tasks(self, app, scheduler):
+    async def create_on_start_tasks(self, app, scheduler):
+        """Этот метод запускает сервер, планировщик и фоновые задачи, запускаемые на старте"""
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, host=SERVER_HOST, port=SERVER_PORT)
         await site.start()
         scheduler.start()
 
-        # Переделать потом на генерацию из списка
         on_start_tasks = asyncio.create_task(self.add_equipment_data())
-        controllers_bus = asyncio.create_task(event_generator(self.cntrls_events))
+        controllers_bus = asyncio.create_task(event_generator(self.events_monitoring))
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
-        # discord_sender = asyncio.create_task(self.discord_bot.start_bot_sender())
-        test_task = asyncio.create_task(self.test_working())
-        logging_task = asyncio.create_task(PBlogs.logging_task())
 
-        await asyncio.gather(controllers_bus, test_task, event_listener, logging_task,
-                             on_start_tasks)
+        await asyncio.gather(controllers_bus, event_listener, on_start_tasks)
 
     def start_server(self):
+        """Это основай метод запуска работы приложения"""
         app = self.create_server()
         scheduler = self.create_scheduler()
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.create_tasks(app, scheduler))
+        loop.run_until_complete(self.create_on_start_tasks(app, scheduler))
         loop.run_forever()

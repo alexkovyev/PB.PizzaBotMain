@@ -6,7 +6,7 @@ import random
 
 from functools import partial
 
-from kiosk_modes.BaseMode import BaseMode
+from kiosk_state.BaseMode import BaseMode
 from config.recipe_data import recipe_data
 from .BaseOrder import BaseOrder
 from .CookingModeErrors import OvenReserveFailed

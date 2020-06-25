@@ -5,7 +5,7 @@ import time
 from pydispatch import Dispatcher
 
 """PBM использует следующие методы и объекты контроллеров:
-1. экземпляр класса ControllersEvents cntrls_events
+1. экземпляр класса ControllersEvents events_monitoring
 2. методы класса Controller:
    - give_dough
    - give_sauce
@@ -24,7 +24,7 @@ from pydispatch import Dispatcher
 class ControllersEvents(Dispatcher):
     """ Это внутренний метод контроллеров
     Dispatcher for controller event handlers. DON'T CREATE instances of this class, use
-    cntrls_events.
+    events_monitoring.
     """
     _events_ = ['qr_scanned', 'hardware_status_changed', 'equipment_washing_request']
 
