@@ -218,10 +218,8 @@ class CookingMode(BaseMode):
         :param oven_data: объект класса Oven
         :return list of OvenUnit instance selected for the order
         """
-        print("Это блюда в заказе", new_order)
         try:
             ovens_reserved = [await self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
-            print("ЭТО в RESERVE", ovens_reserved)
             return ovens_reserved
         except OvenReservationError:
             raise OvenReserveFailed("Ошибка назначения печей на заказ. Нет свободных печей")
@@ -236,7 +234,6 @@ class CookingMode(BaseMode):
         # резервируем печи для заказа (сразу 2 шт)
         try:
             ovens_reserved = await self.reserve_oven(order_content)
-            print("Это резульат в создании блюда", ovens_reserved)
         except OvenReserveFailed:
             pass
         order = BaseOrder(order_content, ovens_reserved)
@@ -301,12 +298,19 @@ class CookingMode(BaseMode):
                 if dish.id == dish_id:
                     return dish.status
 
-    async def change_oven_in_dish(self, dish_id, new_oven):
+    async def get_dish_object(self, dish_id):
         for order in self.current_orders_proceed.values():
-            print(order)
             for dish in order.dishes:
                 if dish.id == dish_id:
-                    dish.oven_unit = new_oven
+                    return dish
+
+    async def change_oven_in_dish(self, dish_object, new_oven_object):
+        """
+        :param dish_id:
+        :param new_oven:
+        :return: dish instance BaseDish class
+        """
+        dish_object.oven_unit = new_oven_object
 
     async def broken_oven_handler(self, broken_oven_id):
         """ Этот метод обрабатывает поломку печи"""
@@ -316,22 +320,28 @@ class CookingMode(BaseMode):
         oven_status = ovens_list[broken_oven_id].status
         dish_id_in_broken_oven = ovens_list[broken_oven_id].dish
         new_oven_object = await self.equipment.oven_available.oven_reserve(dish_id_in_broken_oven)
+        dish_object = await self.get_dish_object(dish_id_in_broken_oven)
         if oven_status == "reserved":
             try:
                 print("Печь забронирована, нужно переназначить печь")
                 ovens_list[broken_oven_id].dish = None
-                await self.change_oven_in_dish(dish_id_in_broken_oven, new_oven_object)
+                await self.change_oven_in_dish(dish_object, new_oven_object)
             except OvenReservationError:
                 pass
         elif oven_status == "occupied":
+            print("Печь занята, блюдо готовится")
             dish_status = await self.get_dish_status(dish_id_in_broken_oven)
-            await self.change_oven_in_dish(dish_id_in_broken_oven, new_oven_object)
+            await self.change_oven_in_dish(dish_object, new_oven_object)
             if dish_status == "cooking":
                 print("Запутить смену лопаток в высокий приоритет")
-                await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, new_oven_object.oven_id, broken_oven_id))
+                await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, (new_oven_object.oven_id,
+                                                                                  broken_oven_id)))
                 ovens_list[broken_oven_id].dish = None
             elif dish_status == "baking":
                 print("Запустить ликвидацю блюда")
+                await self.low_priority_queue.put(dish_object.throwing_away_chain_list)
+        elif oven_status == "waiting_15" or "waiting_60":
+            pass
         self.equipment.oven_available.oven_units[broken_oven_id].status = BROKEN_STATUS
         print("Мы обработали печь")
 

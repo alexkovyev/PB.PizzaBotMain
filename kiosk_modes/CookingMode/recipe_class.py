@@ -17,6 +17,7 @@ class ConfigMixin(object):
     PACKING = "станция упаковки"
     GIVE_OUT = "пункт выдачи"
     GARBAGE_STATION = "пункт утилизации"
+    STOP_STATUS = "failed_to_be_cooked"
 
 
 class Recipy(ConfigMixin):
@@ -304,7 +305,6 @@ class Recipy(ConfigMixin):
         """Подумать как разделить на 2 части"""
         print("Начинается chain Возьми ТЕСТО", time.time())
         self.status = "cooking"
-        # self.status = self.status_change("cooking")
         chain_list = [(self.change_gripper, "None"),
                       (self.move_to_object, (self.oven_unit, None)),
                       (self.get_vane_from_oven, None),
@@ -418,7 +418,9 @@ class Recipy(ConfigMixin):
                 print("!!!!!!!!!!!!!!блюдо не забрали, запускаем чистку")
                 self.oven_future.set_result("time is over")
                 self.oven_unit.status = "cleaning"
-                await self.throwing_dish_away(self.oven_unit)
+                await args[1].high_priority_queue.put_nowait()
+                # await self.throwing_dish_away(self.oven_unit)
+                self.status = self.STOP_STATUS
 
     async def time_changes_handler(self, time_futura, is_limit_factor = None,  *args):
         """Обрабатывает результаты футуры об изменении времени выпечки"""
@@ -464,17 +466,18 @@ class Recipy(ConfigMixin):
         await self.chain_execute(chain_list)
         print("Закончили упаковку и выдачу пиццы")
 
-    async def throwing_dish_away(self, oven_unit):
+    async def throwing_dish_away(self):
         print("Запускаем выбрасывание блюда", time.time())
         chain_list = [(self.change_gripper, "None"),
-                      (self.move_to_object, (oven_unit, None)),
+                      (self.move_to_object, (self.oven_unit, None)),
                       (self.get_vane_from_oven, None),
                       (self.move_to_object, (self.GARBAGE_STATION, None)),
-                      (self.move_to_object, (oven_unit, None)),
+                      (self.move_to_object, (self.oven_unit, None)),
         ]
         await self.chain_execute(chain_list)
-        oven_unit.status = "free"
-        oven_unit.dish = None
+        self.oven_unit.status = "free"
+        self.oven_unit.dish = None
+        self.status = self.STOP_STATUS
         print("Закончили выбрасывание блюда")
 
     async def switch_vanes(self, broken_oven_unit):

@@ -21,7 +21,7 @@ class Equipment(object):
     waiting_60 - ждем до 60 минут
     cleaning - чистим
     """
-    OVEN_STATUSES = ["broken", "free", "reserved", "occupied", "short_stand_by", "long_stand_by"]
+    OVEN_STATUSES = ["broken", "free", "reserved", "occupied", "waiting_15", "waiting_60"]
 
     def __init__(self, equipment_data):
         self.oven_available = Oven(equipment_data["ovens"])
@@ -30,7 +30,6 @@ class Equipment(object):
         self.sauce_dispensers = equipment_data["sauce_dispensers"]
         self.dough_dispensers = equipment_data["dough_dispensers"]
         self.pick_up_points = equipment_data["pick_up_points"]
-        print("Данные о печах выглядят так", self.oven_available)
 
 
 class Oven(object):
@@ -38,7 +37,6 @@ class Oven(object):
         # self.oven_units = ovens_data
         # {'e0714152-182a-4da0-9d06-5190ad44d919': <server.equipment.OvenUnit object at 0x03C74D60>}
         self.oven_units = {i: OvenUnit(ovens_data[i]) for i in ovens_data}
-        print("Это объекты печи юниты", self.oven_units)
 
     async def fetch_oven_list_by_status(self, oven_status):
         """Этот метод получает список печей с необходимым статусом
@@ -46,7 +44,6 @@ class Oven(object):
         [ < server.equipment.OvenUnit object at 0x03C74D60 >, < server.equipment.OvenUnit object at0x03C74928 >]
         """
         free_oven_list = [oven for oven in self.oven_units.values() if oven.status == oven_status]
-        print(free_oven_list)
         return free_oven_list
 
     # def is_able_to_cook(self):
@@ -84,14 +81,12 @@ class Oven(object):
         try:
             print("Запускается резервация оборудования печи")
             oven_id = await self.select_oven_by_status(oven_status="free")
-            print("oven_id", oven_id)
         except NoFreeOvenError:
             print("Какая то супер ошибка, печей нет! Работать не можем Перенесли на уровень выше")
             raise OvenReservationError("Нет свободных печей, не можем работать")
         self.oven_units[oven_id].status = "reserved"
         self.oven_units[oven_id].dish = dish_id
         print("Статус печи изменен")
-        print("Возвращаем объект, а не номер печи", self.oven_units[oven_id])
         return self.oven_units[oven_id]
 
     # async def get_dish_status(self, dish_id, current_orders_dict):
