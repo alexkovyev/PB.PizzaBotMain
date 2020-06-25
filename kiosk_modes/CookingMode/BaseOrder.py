@@ -14,6 +14,7 @@ class BaseOrder(object):
 
         self.ref_id = new_order["refid"]
         self.dishes = self.dish_creation(new_order["dishes"], ovens_reserved)
+        print("Это печи при создании заказа")
         self.status = "received"
         self.pickup_point = None
         self.is_order_ready_monitoring = []

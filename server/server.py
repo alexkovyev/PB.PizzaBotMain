@@ -73,7 +73,7 @@ class PizzaBotMain(object):
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.test_scheduler, 'interval', seconds=5)
         # переделать на включение в определенный момент
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='23', minute=59, second=0)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='10', minute=33, second=5)
         return scheduler
 
     def get_config_data(self):
@@ -151,6 +151,7 @@ class PizzaBotMain(object):
             event_data = await event
             _, new_data = event_data
             # тут добавить, что делать если не печи и ниже только для обработки поломки печи
+            print("Сработало событие, обрабатываем")
             await self.current_instance.broken_equipment_handler(new_data)
 
     async def create_tasks(self, app, scheduler):

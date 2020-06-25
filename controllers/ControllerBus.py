@@ -67,7 +67,7 @@ async def event_generator(cntrls_events):
                                                        "status": "broken"}
         Приходят только уведомления о поломке, возобнавление работы через "оператора и перезагрузку"
         """
-        print("Сработало событие поломка печи", time.time())
+        print("Сработало событие ПОЛОМКА ПЕЧИ", time.time())
         cntrls_events.hardware_status_changed('21', 'broken')
 
     async def equipment_washing_request(cntrls_events):
@@ -85,7 +85,7 @@ async def event_generator(cntrls_events):
         my_choice = random.randint(0, 2)
         what_happened = options[my_choice]
         await what_happened(cntrls_events)
-        n = random.randint(60, 140)
+        n = random.randint(20, 40)
         print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
         await asyncio.sleep(n)
         print("Trouble-maker снова с нами", time.time())

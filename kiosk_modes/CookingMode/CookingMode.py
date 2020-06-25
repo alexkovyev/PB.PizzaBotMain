@@ -16,9 +16,10 @@ from controllers.ControllerBus import Controllers
 from .recipe_class import Recipy
 
 
-class BeforeCooking(object):
+class BeforeCooking(BaseMode):
 
     def __init__(self):
+        super().__init__()
         self.status = "getting_ready"
 
     @classmethod
@@ -63,6 +64,7 @@ class CookingMode(BaseMode):
     STOP_STATUS = "failed_to_be_cooked"
 
     def __init__(self, recipes, equipment):
+        super().__init__()
         self.recipes = recipes
         self.equipment = equipment
         self.current_orders_proceed = {}
@@ -218,7 +220,8 @@ class CookingMode(BaseMode):
         """
         print("Это блюда в заказе", new_order)
         try:
-            ovens_reserved = [self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
+            ovens_reserved = [await self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
+            print("ЭТО в RESERVE", ovens_reserved)
             return ovens_reserved
         except OvenReservationError:
             raise OvenReserveFailed("Ошибка назначения печей на заказ. Нет свободных печей")
@@ -233,6 +236,7 @@ class CookingMode(BaseMode):
         # резервируем печи для заказа (сразу 2 шт)
         try:
             ovens_reserved = await self.reserve_oven(order_content)
+            print("Это резульат в создании блюда", ovens_reserved)
         except OvenReserveFailed:
             pass
         order = BaseOrder(order_content, ovens_reserved)
@@ -286,7 +290,7 @@ class CookingMode(BaseMode):
         oven_id = int(event_data["unit_name"])
         oven_status = event_data["status"]
         # начало симуляции работы
-        oven_id = random.choice(self.equipment.oven_available.oven_units.keys())
+        oven_id = random.choice(list(self.equipment.oven_available.oven_units.keys()))
         print("Сломалась печь", oven_id)
         await self.broken_oven_handler(oven_id)
         print("Обработали", oven_id, oven_status)
@@ -298,8 +302,9 @@ class CookingMode(BaseMode):
                     return dish.status
 
     async def change_oven_in_dish(self, dish_id, new_oven):
-        for order in self.current_orders_proceed:
-            for dish in order:
+        for order in self.current_orders_proceed.values():
+            print(order)
+            for dish in order.dishes:
                 if dish.id == dish_id:
                     dish.oven_unit = new_oven
 
@@ -310,7 +315,7 @@ class CookingMode(BaseMode):
         ovens_list = self.equipment.oven_available.oven_units
         oven_status = ovens_list[broken_oven_id].status
         dish_id_in_broken_oven = ovens_list[broken_oven_id].dish
-        new_oven_object = await ovens_list.oven_reserve(dish_id_in_broken_oven)
+        new_oven_object = await self.equipment.oven_available.oven_reserve(dish_id_in_broken_oven)
         if oven_status == "reserved":
             try:
                 print("Печь забронирована, нужно переназначить печь")
@@ -327,7 +332,7 @@ class CookingMode(BaseMode):
                 ovens_list[broken_oven_id].dish = None
             elif dish_status == "baking":
                 print("Запустить ликвидацю блюда")
-        oven_status = BROKEN_STATUS
+        self.equipment.oven_available.oven_units[broken_oven_id].status = BROKEN_STATUS
         print("Мы обработали печь")
 
 

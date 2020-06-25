@@ -133,6 +133,7 @@ class Recipy(ConfigMixin):
     async def controllers_oven(self, oven_mode, recipe):
         time_changes = asyncio.get_running_loop().create_future()
         await self.time_changes_handler(time_changes)
+        print("Это в контроллерах выпечка", self.oven_unit.oven_id)
         operation_results = await Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes)
         return operation_results
 

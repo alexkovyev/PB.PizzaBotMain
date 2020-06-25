@@ -46,6 +46,7 @@ class Oven(object):
         [ < server.equipment.OvenUnit object at 0x03C74D60 >, < server.equipment.OvenUnit object at0x03C74928 >]
         """
         free_oven_list = [oven for oven in self.oven_units.values() if oven.status == oven_status]
+        print(free_oven_list)
         return free_oven_list
 
     # def is_able_to_cook(self):
@@ -81,7 +82,9 @@ class Oven(object):
         :return instance OvenUnit class
         """
         try:
+            print("Запускается резервация оборудования печи")
             oven_id = await self.select_oven_by_status(oven_status="free")
+            print("oven_id", oven_id)
         except NoFreeOvenError:
             print("Какая то супер ошибка, печей нет! Работать не можем Перенесли на уровень выше")
             raise OvenReservationError("Нет свободных печей, не можем работать")
