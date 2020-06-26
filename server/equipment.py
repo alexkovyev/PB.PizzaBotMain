@@ -89,45 +89,6 @@ class Oven(object):
         print("Статус печи изменен")
         return self.oven_units[oven_id]
 
-    # async def get_dish_status(self, dish_id, current_orders_dict):
-    #     for order in current_orders_dict:
-    #         for dish in order:
-    #             if dish.id == dish_id:
-    #                 return dish.status
-    #
-    # async def change_oven_in_dish(self, dish_id, current_orders_dict, new_oven):
-    #     for order in current_orders_dict:
-    #         for dish in order:
-    #             if dish.id == dish_id:
-    #                 dish.oven_unit = new_oven
-    #
-    # async def broken_oven_handler(self, oven_id, current_orders_dict):
-    #     """Это группа функций обрабатывает поломку печи.
-    #     - поиск назначенных блюд на печь
-    #     - замена печи на исправную
-    #     """
-    #     BROKEN_STATUS = "broken"
-    #     print("Обрабатываем уведомление о поломке печи", oven_id)
-    #     oven_status = self.oven_units[oven_id].status
-    #     dish_in_broken_oven = self.oven_units[oven_id].dish
-    #     if oven_status == "reserved":
-    #         print("Нужно переназначить печь")
-    #         # может быть, что печей свободных нет. Добавитьь обработку
-    #         new_oven_id = self.get_first_free_oven()
-    #         print("Перезначаем блюдо", self.oven_units[oven_id].dish)
-    #         self.oven_units[new_oven_id].dish = dish_in_broken_oven
-    #     elif oven_status == "occupied":
-    #         dish_status = await self.get_dish_status(dish_in_broken_oven, current_orders_dict)
-    #         broken_oven_id = oven_id
-    #         new_oven = await self.oven_reserve(dish_in_broken_oven)
-    #         # если выкидываем блюдо то печь не меняем
-    #         await self.change_oven_in_dish(dish_in_broken_oven, current_orders_dict, new_oven)
-    #         if dish_status == "cooking":
-    #             print("Запутить смену лопаток в высокий приоритет")
-    #         elif dish_status == "baking":
-    #             print("Запустить ликвидацю блюда")
-    #     oven_status = "broken"
-    #     print("Мы обработали печь")
 
 class OvenUnit(object):
     def __init__(self, oven_data):

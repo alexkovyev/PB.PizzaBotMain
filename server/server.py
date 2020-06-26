@@ -1,12 +1,14 @@
 """ Этот модуль описывает http сервер и фоновые задачи, запускаемые на старте"""
 import asyncio
 from aiohttp import web
+from aiohttp_json_rpc import JsonRpc
 import time
 import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config.config import SERVER_HOST, SERVER_PORT, STANDBYMODE, COOKINGMODE, TESTINGMODE
+from config.config import (SERVER_HOST, SERVER_PORT,
+                           STANDBYMODE, BEFORECOOKING, COOKINGMODE, TESTINGMODE)
 from controllers.ControllerBus import ControllersEvents, event_generator
 from server.equipment import Equipment
 from kiosk_state.CookingMode import CookingMode
@@ -35,7 +37,10 @@ class PizzaBotMain(object):
     def create_scheduler(self):
         """Этот метод создает планровщик для запуска команд по расписанию"""
         scheduler = AsyncIOScheduler()
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='0', minute=17, second=20)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='10', minute=0, second=0)
+        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='19', minute=24, second=0)
+        scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='21', minute=0, second=0)
+        scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='22', minute=0, second=0)
         return scheduler
 
     def setup_routes(self, app):
@@ -44,9 +49,14 @@ class PizzaBotMain(object):
         """
         app.add_routes([
             web.post("/api/new_order", self.new_order_handler),
-            # все доступные команды
-            # web.get("/api/commands", None),
-            # web.post("/api/commands/cooking_mode", None)
+            web.post("/api/commands/cooking_mode", self.turn_cooking_mode_handler),
+            web.get("/api/commands/state/status", self.turn_cooking_mode_handler),
+            # web.post("/api/commands/stopping_cooking_mode", self.turn_off_cooking_mode_handler),
+            # web.post("/api/commands/full_system_testing", self.start_full_tesing_handler),
+            # web.post("/api/commands/unit_testing"),
+            # web.post("/api/commands/unit_testing/status"),
+            # web.post(r"/api/commands/activation/{unit_id}"),
+            # web.post(r"/api/commands/de-activation/{unit_id}"),
         ])
 
     async def new_order_handler(self, request):
@@ -76,25 +86,57 @@ class PizzaBotMain(object):
             message = "Заказы не принимаем, приходите завтра"
             raise web.HTTPNotAcceptable(text=message)
 
+    async def turn_cooking_mode_handler(self, request):
+        """Этот метод обрабатывает запроса на включение режима готовки """
+        print("Получили запрос на включение режима готовки")
+        if self.current_state == COOKINGMODE or self.current_state == BEFORECOOKING:
+            print("Этот режим уже включен")
+            raise web.HTTPNotAcceptable(text="Этот режим уже включен")
+        elif self.current_state == STANDBYMODE:
+            print("Ок, включаем")
+            asyncio.create_task(self.cooking_mode_start())
+            raise web.HTTPCreated(text="Процедура включения запущена")
+        elif self.current_state == TESTINGMODE:
+            print("Идет тестирование, включить не можем")
+            raise web.HTTPBadRequest(text="Идет тестирование, включить не можем")
+
+    async def turn_off_cooking_mode_handler(self, request):
+        print("Получили запрос на включение режима готовки")
+        pass
+
+    async def start_full_tesing_handler(self, request):
+        print("Получили запрос на включение режима готовки")
+        pass
+
+    async def cooking_mode_start(self):
+        print("ЗАПУСКАЕМ режим ГОТОВКИ")
+        self.current_instance = CookingMode.BeforeCooking()
+        if self.equipment is None:
+            print("ОШИБКА ОБОРУДОВАНИЯ")
+            self.equipment = await self.add_equipment_data()
+        (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
+        self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
+        self.current_state = COOKINGMODE
+        await self.current_instance.cooking()
+
     async def is_open_for_new_orders(self):
         """Метод определяет можно ли принимать заказы"""
         return True if self.current_state == COOKINGMODE else False
 
+    async def turn_on_testing_mode(self, mode):
+        pass
+
     async def turn_on_cooking_mode(self):
         """Этот метод запускает режим готовки"""
+        IMPOSSIBLE_TO_TURN_ON_STATES = [TESTINGMODE, COOKINGMODE, BEFORECOOKING]
         if self.current_state == STANDBYMODE:
-            print("ЗАПУСКАЕМ режим ГОТОВКИ")
-            self.current_instance = CookingMode.BeforeCooking()
-            if self.equipment is None:
-                print("ОШИБКА ОБОРУДОВАНИЯ")
-                self.equipment = await self.add_equipment_data()
-            (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
-            self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
-            self.current_state = COOKINGMODE
-            await self.current_instance.cooking()
-        elif self.current_state == "testing_mode":
-            pass
+            await self.cooking_mode_start()
+        elif self.current_state in IMPOSSIBLE_TO_TURN_ON_STATES:
+            print("киоск занят, не могу включить")
         print("Режим готовки активирован", self.current_state)
+
+    async def turn_off_cooking_mode(self):
+        pass
 
     async def create_hardware_broke_listener(self):
         """Этот метод запускает бесконечный таск, который отслеживает наступление событий

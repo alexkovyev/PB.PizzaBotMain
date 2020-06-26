@@ -4,6 +4,7 @@ SERVER_PORT = 8080
 STANDBYMODE = "stand_by"
 COOKINGMODE = "cooking_mode"
 TESTINGMODE = "testing_mode"
+BEFORECOOKING = "before_cooking"
 
 SCHEDULE = {
 
