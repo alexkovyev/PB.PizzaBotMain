@@ -318,34 +318,34 @@ class CookingMode(BaseMode):
         BROKEN_STATUS = "broken"
         ovens_list = self.equipment.oven_available.oven_units
         oven_status = ovens_list[broken_oven_id].status
-        dish_id_in_broken_oven = ovens_list[broken_oven_id].dish
-        new_oven_object = await self.equipment.oven_available.oven_reserve(dish_id_in_broken_oven)
-        dish_object = await self.get_dish_object(dish_id_in_broken_oven)
-        if oven_status == "reserved":
-            try:
-                print("Печь забронирована, нужно переназначить печь")
-                ovens_list[broken_oven_id].dish = None
+        print("СТАТУС сломанной ПЕЧИ", oven_status)
+        if oven_status != "free":
+            dish_id_in_broken_oven = ovens_list[broken_oven_id].dish
+            new_oven_object = await self.equipment.oven_available.oven_reserve(dish_id_in_broken_oven)
+            dish_object = await self.get_dish_object(dish_id_in_broken_oven)
+            if oven_status == "reserved":
+                try:
+                    print("Печь забронирована, нужно переназначить печь")
+                    ovens_list[broken_oven_id].dish = None
+                    await self.change_oven_in_dish(dish_object, new_oven_object)
+                except OvenReservationError:
+                    pass
+            elif oven_status == "occupied":
+                print("Печь занята, блюдо готовится")
+                dish_status = await self.get_dish_status(dish_id_in_broken_oven)
                 await self.change_oven_in_dish(dish_object, new_oven_object)
-            except OvenReservationError:
-                pass
-        elif oven_status == "occupied":
-            print("Печь занята, блюдо готовится")
-            dish_status = await self.get_dish_status(dish_id_in_broken_oven)
-            await self.change_oven_in_dish(dish_object, new_oven_object)
-            if dish_status == "cooking":
-                print("Запутить смену лопаток в высокий приоритет")
-                await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, (new_oven_object.oven_id,
+                if dish_status == "cooking":
+                    print("Запутить смену лопаток в высокий приоритет")
+                    await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, (new_oven_object.oven_id,
                                                                                   broken_oven_id)))
-                ovens_list[broken_oven_id].dish = None
-            elif dish_status == "baking":
-                print("Запустить ликвидацю блюда")
-                await self.low_priority_queue.put(dish_object.throwing_away_chain_list)
-        elif oven_status == "waiting_15" or "waiting_60":
-            pass
+                    ovens_list[broken_oven_id].dish = None
+                elif dish_status == "baking":
+                    print("Запустить ликвидацю блюда")
+                    await self.low_priority_queue.put(dish_object.throwing_away_chain_list)
+            elif oven_status == "waiting_15" or "waiting_60":
+                pass
         self.equipment.oven_available.oven_units[broken_oven_id].status = BROKEN_STATUS
         print("Мы обработали печь")
-
-
 
     async def qr_code_handler(self, params):
         """Этот метод проверяет, есть ли заказ с таким чек кодом в current_orders_proceed.
