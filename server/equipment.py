@@ -24,7 +24,7 @@ class Equipment(object):
     OVEN_STATUSES = ["broken", "free", "reserved", "occupied", "waiting_15", "waiting_60"]
 
     def __init__(self, equipment_data):
-        self.oven_available = Oven(equipment_data["ovens"])
+        self.ovens = Oven(equipment_data["ovens"])
         self.cut_station = equipment_data["cut_station"]
         self.package_station = equipment_data["package_station"]
         self.sauce_dispensers = equipment_data["sauce_dispensers"]
@@ -45,18 +45,6 @@ class Oven(object):
         """
         free_oven_list = [oven for oven in self.oven_units.values() if oven.status == oven_status]
         return free_oven_list
-
-    # def is_able_to_cook(self):
-    #     """Определяет, можно ли готовить на основе того, исправно ли оборудование
-    #     учитывает ли это, сколько печей свободно и если их 0.
-    #     Если у нас 1 работающая печь киоск все равно работает, или нет?"""
-    #     operate_oven_qt = self.fetch_free_oven_list()
-    #     # как то проверяем, работают ли узлы выдачи
-    #     equipment_status = True if self.is_cut_station_ok and \
-    #                                self.is_package_station_ok and \
-    #                                len(operate_oven_qt) > 1 \
-    #         else False
-    #     return equipment_status
 
     async def select_oven_by_status(self, oven_status):
         """Этот метод получает id печи, котрая последняя в списке c нужным статусом

@@ -28,20 +28,20 @@ class ControllersEvents(Dispatcher):
     """
     _events_ = ['qr_scanned', 'hardware_status_changed', 'equipment_washing_request']
 
-    def qr_scanned(self, _params):
-        self.emit('qr_scanned', params=_params)
+    def qr_scanned(self, params):
+        self.emit('qr_scanned', params=params)
 
-    def hardware_status_changed(self, _unit_name, _status):
-        self.emit('hardware_status_changed', unit_name=_unit_name, status=_status)
+    def hardware_status_changed(self, unit_type,  unit_name):
+        self.emit('hardware_status_changed', unit_type=unit_type, unit_name=unit_name)
 
-    def request_for_wash(self, _unit_name):
-        self.emit('equipment_washing_request', unit_name=_unit_name)
+    def request_for_wash(self, unit_name):
+        self.emit('equipment_washing_request', unit_name=unit_name)
 
 
 cntrls_events = ControllersEvents()
 
 
-async def event_generator(cntrls_events):
+async def event_generator(cntrls_events, equipment):
     """ PBM подписывается на следующие уведомления:
     - сканирование qr-code
     - изменение статуса следующего оборудования: печи, станция нарезки, узел упаковки, соусо-поливательная станция,
@@ -50,7 +50,7 @@ async def event_generator(cntrls_events):
     Описание события см в описании метода
     """
 
-    async def qr_code_scanning_alarm(cntrls_events):
+    async def qr_code_scanning_alarm(cntrls_events, *args):
         """ В теле уведомления (params) в словаре необходимо указать следующие данные
         (пары key:value с аннотацией типов)
         - "check_code": str,  value: str
@@ -60,21 +60,45 @@ async def event_generator(cntrls_events):
         params = {"ref_id": 65, "pickup": 1}
         cntrls_events.qr_scanned(params)
 
-    async def hardware_status_changed(cntrls_events):
+    async def hardware_status_changed(cntrls_events, equipment):
         """ ВОПРОС ТРЕБУЕТ ОТВЕТА к контроллерам: по идее тут все оборудование. Вы просто выдаете идентификатор и статус
         или будет еще тип: "oven", "cut_station", те {"equipment_type": cut_station,
-                                                      "uuid": o48932492834281,
-                                                       "status": "broken"}
+                                                      "uuid": o48932492834281}
         Приходят только уведомления о поломке, возобнавление работы через "оператора и перезагрузку"
         """
         print("Сработало событие ПОЛОМКА ПЕЧИ", time.time())
-        cntrls_events.hardware_status_changed('21', 'broken')
+        print("Это оборудование из поломки",equipment)
+        data = {
+            "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
+            "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
+            "sauce_dispensers": {"16ffcee8-2130-4a2f-b71d-469ee65d42d0": True,
+                                 "ab5065e3-93aa-4313-869e-50a959458439": True,
+                                 "28cc0239-2e35-4ccd-9fcd-be2155e4fcbe": True,
+                                 "1b1af602-b70f-42a3-8b5d-3112dcf82c26": True,
+                                 },
+            "dough_dispensers": {"ebf29d04-023c-4141-acbe-055a19a79afe": True,
+                                 "2e84d0fd-a71f-4988-8eee-d0373c0bc609": True,
+                                 "68ec7c16-f57b-43c0-b708-dfaea5c2e1dd": True,
+                                 "75355f3c-bf05-405d-98af-f04bcba7d7e4": True,
+                                 },
+            "pick_up_points": {"1431f373-d036-4e0f-b059-70acd6bd18b9": True,
+                               "b7f96101-564f-4203-8109-014c94790978": True,
+                               "73b194e1-5926-45be-99ec-25e1021b96f7": True,
+                               }
+        }
+        unit_type = random.choice(["ovens", "cut_station", "package_station", "sauce_dispensers"])
+        if unit_type != "ovens":
+            unit_id = random.choice(list(data[unit_type].keys()))
+        else:
+            unit_id = random.choice(list(equipment.ovens.oven_units.keys()))
+        print(unit_type, unit_id)
+        cntrls_events.hardware_status_changed(unit_type, unit_id)
 
-    async def equipment_washing_request(cntrls_events):
+    async def equipment_washing_request(cntrls_events, *args):
         """Информирует о том, что необходимо провести мойку такого то оборудования"""
         print("Нужно помыть оборудование", time.time())
-        _unit_name = "cut_station"
-        cntrls_events.request_for_wash(_unit_name)
+        unit_name = "cut_station"
+        cntrls_events.request_for_wash(unit_name)
 
     while True:
         # это эмуляция работы контроллеров по генерации разных событий
@@ -84,8 +108,8 @@ async def event_generator(cntrls_events):
         options = [qr_code_scanning_alarm, hardware_status_changed, equipment_washing_request]
         my_choice = random.randint(0, 2)
         what_happened = options[my_choice]
-        await what_happened(cntrls_events)
-        n = random.randint(20, 40)
+        await what_happened(cntrls_events, equipment)
+        n = random.randint(10, 20)
         print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
         await asyncio.sleep(n)
         print("Trouble-maker снова с нами", time.time())

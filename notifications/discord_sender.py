@@ -7,8 +7,8 @@ from config.config import DISCORD_TOKEN
 class DiscordBotAccess(discord.Client):
 
     def __init__(self):
+        super().__init__()
         self.token = DISCORD_TOKEN
-        self.prefix = '!'
         self.receivers = {
             "operator": {},
             "admin": {}
@@ -31,7 +31,6 @@ class DiscordBotAccess(discord.Client):
     async def on_ready(self):
         """Event for launching client
         Get admin and operator channels dinamically"""
-        print("Logged in as {0}!".format(self.user.name))
         for channel in self.get_all_channels():
             if channel.type == discord.ChannelType.text:
                 name = channel.name
@@ -50,6 +49,7 @@ class DiscordBotAccess(discord.Client):
         A message code : string\n
         Data : a dictionary of data for message template"""
 
+        print("Работает discord отправитель")
         async def form_message(reciever, data):
             # channel_key = reciever + '_' + point_key
             channel_key = reciever
@@ -61,24 +61,6 @@ class DiscordBotAccess(discord.Client):
             await form_message(receiver, data)
             print('Message is sent')
 
-    async def send(self):
-        print("Работает discord отправитель")
-        await self.wait_until_ready()
-        while self.is_ready:
-            print("приготовились отправлять")
-            message_code = "out_of_stock"
-            data = {'id': '1', 'address': 'here', 'halfstaff_name': 'пельмени', 'N': '3', 'min_qt': '1'}
-            await self.send_messages(message_code, data)
-        await asyncio.sleep(5)
-
     async def start_working(self):
-        while True:
-            print("Начинаем цикл отправки сообщения")
-            await self.start(self.token)
-            await self.send()
-
-    async def start_bot_sender(self):
-        loop = asyncio.get_running_loop()
-        loop.create_task(self.start_working())
-
-
+        print("Начинаем цикл отправки сообщения")
+        await self.start(self.token)

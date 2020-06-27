@@ -9,10 +9,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config.config import (SERVER_HOST, SERVER_PORT,
                            STANDBYMODE, BEFORECOOKING, COOKINGMODE, TESTINGMODE)
 from controllers.ControllerBus import ControllersEvents, event_generator
-from server.equipment import Equipment
 from kiosk_state.CookingMode import CookingMode
 from kiosk_state import StandByMode, TestingMode
+from notifications.discord_sender import DiscordBotAccess
 from logs.logs import PBlogs
+from server.equipment import Equipment
 
 
 class PizzaBotMain(object):
@@ -20,10 +21,12 @@ class PizzaBotMain(object):
 
     def __init__(self):
         self.current_state = STANDBYMODE
-        self.current_instance = StandByMode.StandBy()
         self.equipment = None
         self.events_monitoring = ControllersEvents()
         self.command_status = {}
+        self.is_able_to_cook = True
+        self.current_instance = StandByMode.StandBy()
+        self.discord_bot_client = DiscordBotAccess()
 
     def create_server(self):
         """Этот метод создает приложение aiohttp сервера, а также привязывает routes api
@@ -38,9 +41,7 @@ class PizzaBotMain(object):
         """Этот метод создает планровщик для запуска команд по расписанию"""
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='10', minute=0, second=0)
-        scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='23', minute=50, second=0)
         scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='21', minute=0, second=0)
-        scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='22', minute=0, second=0)
         return scheduler
 
     def setup_routes(self, app):
@@ -54,9 +55,8 @@ class PizzaBotMain(object):
             web.get("/api/commands/status", self.status_command),
             # web.post("/api/commands/stopping_cooking_mode", self.turn_off_cooking_mode_handler),
             web.post("/api/commands/full_system_testing", self.start_full_testing_handler),
-            web.post("/api/commands/unit_testing", self.start_unit_testing),
-            # web.post(r"/api/commands/activation/{unit_id}"),
-            # web.post(r"/api/commands/de-activation/{unit_id}"),
+            web.post("/api/commands/unit_testing", self.start_unit_testing_handler),
+            web.post("/api/commands/unit_activation", self.unit_activation_handler),
         ])
 
     # API handlers
@@ -136,7 +136,7 @@ class PizzaBotMain(object):
         elif self.current_state == TESTINGMODE:
             await self.responce_state_is_already_on()
 
-    async def start_unit_testing(self, request):
+    async def start_unit_testing_handler(self, request):
         if self.current_state == STANDBYMODE:
             if not request.body_exists:
                 raise web.HTTPNoContent
@@ -148,6 +148,15 @@ class PizzaBotMain(object):
             return web.Response(text=response)
         else:
             await self.responce_state_is_busy(self.current_state)
+
+    async def unit_activation_handler(self, request):
+        if not request.body_exists:
+            raise web.HTTPNoContent
+        request_body = await request.json()
+        params = {"unit_type": request_body["unit_type"],
+                  "unit_id": request_body["unit_id"]}
+        message = await self.unit_activation(params)
+        return web.Response(text=message)
 
     # Schedule handlers
     async def turn_on_testing_mode(self, mode):
@@ -238,6 +247,30 @@ class PizzaBotMain(object):
         print(message)
         raise web.HTTPBadRequest(text=message)
 
+    async def unit_activation(self, params):
+        unit_type = params["unit_type"]
+        unit_id = params["unit_id"]
+        try:
+            if unit_type != "ovens":
+                print("Меняем данные оборудования")
+                getattr(self.equipment, unit_type)[unit_id] = True
+                print(self.equipment)
+            else:
+                print("Меняем данные печи")
+                self.equipment.ovens.oven_units[unit_id].status = "free"
+            return "200 OK"
+        except KeyError:
+            print("Данные не найдены")
+            return "Данные не найдены"
+
+    async def is_able_to_cook_checker(self):
+        is_cut_station_ok = self.equipment.cut_station.values()
+        is_package_station_ok = True if any(self.equipment.package_station.values()) else False
+        print(any(self.equipment.package_station.values()))
+        print( self.equipment.package_station.values())
+        print("Это упаковка", is_package_station_ok)
+        self.is_able_to_cook = True if (is_cut_station_ok and is_package_station_ok) else False
+
     #on_start_tasks
     async def create_hardware_broke_listener(self):
         """Этот метод запускает бесконечный таск, который отслеживает наступление событий
@@ -248,38 +281,82 @@ class PizzaBotMain(object):
             event_occurrence = await event
             _, event_params = event_occurrence
             print("Сработало событие, обрабатываем")
-            await self.current_instance.broken_equipment_handler(event_params)
+            await self.current_instance.broken_equipment_handler(event_params, self.equipment)
+            await self.is_able_to_cook_checker()
+            print("Можем ли готовить", self.is_able_to_cook)
 
-    async def get_equipment_data(self):
-        await asyncio.sleep(10)
+    # async def get_equipment_data(self):
+    #     await asyncio.sleep(10)
+    #     oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
+    #     equipment_data = {
+    #         "ovens": {i: {"oven_id": i, "status": "free"} for i in oven_ids},
+    #         "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
+    #         "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
+    #         "sauce_dispensers": {"16ffcee8-2130-4a2f-b71d-469ee65d42d0": True,
+    #                              "ab5065e3-93aa-4313-869e-50a959458439": True,
+    #                              "28cc0239-2e35-4ccd-9fcd-be2155e4fcbe": True,
+    #                              "1b1af602-b70f-42a3-8b5d-3112dcf82c26": True,
+    #                              },
+    #         "dough_dispensers": {"ebf29d04-023c-4141-acbe-055a19a79afe": True,
+    #                              "2e84d0fd-a71f-4988-8eee-d0373c0bc609": True,
+    #                              "68ec7c16-f57b-43c0-b708-dfaea5c2e1dd": True,
+    #                              "75355f3c-bf05-405d-98af-f04bcba7d7e4": True,
+    #                              },
+    #         "pick_up_points": {"1431f373-d036-4e0f-b059-70acd6bd18b9": True,
+    #                            "b7f96101-564f-4203-8109-014c94790978": True,
+    #                            "73b194e1-5926-45be-99ec-25e1021b96f7": True,
+    #                            }
+    #     }
+    #     return equipment_data
+    #
+    # async def add_equipment_data(self):
+    #     """Этот метод запускает сбор данных об оборудовании из БД и создает экземпляр класса Equipment"""
+    #     equipment_data = await self.get_equipment_data()
+    #     self.equipment = Equipment(equipment_data)
+
+    async def send_message(self):
+        message_code = "out_of_stock"
+        data = {'id': '1', 'address': 'here', 'halfstaff_name': 'пельмени', 'N': '3', 'min_qt': '1'}
+        await self.discord_bot_client.send_messages(message_code, data)
+
+    def get_equipment_data(self):
         oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
         equipment_data = {
             "ovens": {i: {"oven_id": i, "status": "free"} for i in oven_ids},
-            "cut_station": {"id": "f50ec0b7-f960-400d-91f0-c42a6d44e3d0",
-                            "status": "ok"},
-            "package_station": {"id": "afeb1c10-83ef-4194-9821-491fcf0aa52b",
-                                "status": "ok"},
-            "sauce_dispensers": {"16ffcee8-2130-4a2f-b71d-469ee65d42d0": "ok",
-                                 "ab5065e3-93aa-4313-869e-50a959458439": "ok",
-                                 "28cc0239-2e35-4ccd-9fcd-be2155e4fcbe": "ok",
-                                 "1b1af602-b70f-42a3-8b5d-3112dcf82c26": "ok",
+            "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
+            "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
+            "sauce_dispensers": {"16ffcee8-2130-4a2f-b71d-469ee65d42d0": True,
+                                 "ab5065e3-93aa-4313-869e-50a959458439": True,
+                                 "28cc0239-2e35-4ccd-9fcd-be2155e4fcbe": True,
+                                 "1b1af602-b70f-42a3-8b5d-3112dcf82c26": True,
                                  },
-            "dough_dispensers": {"ebf29d04-023c-4141-acbe-055a19a79afe": "ok",
-                                 "2e84d0fd-a71f-4988-8eee-d0373c0bc609": "ok",
-                                 "68ec7c16-f57b-43c0-b708-dfaea5c2e1dd": "ok",
-                                 "75355f3c-bf05-405d-98af-f04bcba7d7e4": "ok",
+            "dough_dispensers": {"ebf29d04-023c-4141-acbe-055a19a79afe": True,
+                                 "2e84d0fd-a71f-4988-8eee-d0373c0bc609": True,
+                                 "68ec7c16-f57b-43c0-b708-dfaea5c2e1dd": True,
+                                 "75355f3c-bf05-405d-98af-f04bcba7d7e4": True,
                                  },
-            "pick_up_points": {"1431f373-d036-4e0f-b059-70acd6bd18b9": "ok",
-                               "b7f96101-564f-4203-8109-014c94790978": "ok",
-                               "73b194e1-5926-45be-99ec-25e1021b96f7": "ok",
+            "pick_up_points": {"1431f373-d036-4e0f-b059-70acd6bd18b9": True,
+                               "b7f96101-564f-4203-8109-014c94790978": True,
+                               "73b194e1-5926-45be-99ec-25e1021b96f7": True,
                                }
         }
         return equipment_data
 
-    async def add_equipment_data(self):
+    def add_equipment_data(self):
         """Этот метод запускает сбор данных об оборудовании из БД и создает экземпляр класса Equipment"""
-        equipment_data = await self.get_equipment_data()
+        equipment_data = self.get_equipment_data()
         self.equipment = Equipment(equipment_data)
+
+    async def is_able_to_cook_monitoring(self):
+        while True:
+            if not self.is_able_to_cook:
+                print("Готовить не можем, выключаем систему")
+            await asyncio.sleep(3)
+
+    async def test_worker(self):
+        while True:
+            await asyncio.sleep(20)
+            await self.send_message()
 
     async def create_on_start_tasks(self, app, scheduler):
         """Этот метод запускает сервер, планировщик и фоновые задачи, запускаемые на старте"""
@@ -289,16 +366,20 @@ class PizzaBotMain(object):
         await site.start()
         scheduler.start()
 
-        on_start_tasks = asyncio.create_task(self.add_equipment_data())
-        controllers_bus = asyncio.create_task(event_generator(self.events_monitoring))
+        # on_start_tasks = asyncio.create_task(self.add_equipment_data())
+        controllers_bus = asyncio.create_task(event_generator(self.events_monitoring, self.equipment))
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
+        is_able_to_cook_monitor = asyncio.create_task(self.is_able_to_cook_monitoring())
+        discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
+        test = asyncio.create_task(self.test_worker())
 
-        await asyncio.gather(controllers_bus, event_listener, on_start_tasks)
+        await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor, discord_sender, test)
 
     def start_server(self):
         """Это основай метод запуска работы приложения"""
         app = self.create_server()
         scheduler = self.create_scheduler()
+        equipment_data = self.add_equipment_data()
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.create_on_start_tasks(app, scheduler))
         loop.run_forever()

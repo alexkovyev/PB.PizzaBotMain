@@ -219,7 +219,7 @@ class CookingMode(BaseMode):
         :return list of OvenUnit instance selected for the order
         """
         try:
-            ovens_reserved = [await self.equipment.oven_available.oven_reserve(dish) for dish in new_order["dishes"]]
+            ovens_reserved = [await self.equipment.ovens.oven_reserve(dish) for dish in new_order["dishes"]]
             return ovens_reserved
         except OvenReservationError:
             raise OvenReserveFailed("Ошибка назначения печей на заказ. Нет свободных печей")
@@ -268,7 +268,7 @@ class CookingMode(BaseMode):
 
         while True:
             print("Работает cooking", time.time())
-            print(self.equipment.oven_available.oven_units)
+            print(self.equipment.ovens.oven_units)
             if self.is_downtime:
                 print("Танцуем, других заданий нет")
                 await RA.dance()
@@ -287,7 +287,7 @@ class CookingMode(BaseMode):
         oven_id = int(event_data["unit_name"])
         oven_status = event_data["status"]
         # начало симуляции работы
-        oven_id = random.choice(list(self.equipment.oven_available.oven_units.keys()))
+        oven_id = random.choice(list(self.equipment.ovens.oven_units.keys()))
         print("Сломалась печь", oven_id)
         await self.broken_oven_handler(oven_id)
         print("Обработали", oven_id, oven_status)
@@ -316,12 +316,12 @@ class CookingMode(BaseMode):
         """ Этот метод обрабатывает поломку печи"""
         print("Обрабатываем уведомление о поломке печи", broken_oven_id)
         BROKEN_STATUS = "broken"
-        ovens_list = self.equipment.oven_available.oven_units
+        ovens_list = self.equipment.ovens.oven_units
         oven_status = ovens_list[broken_oven_id].status
         print("СТАТУС сломанной ПЕЧИ", oven_status)
         if oven_status != "free":
             dish_id_in_broken_oven = ovens_list[broken_oven_id].dish
-            new_oven_object = await self.equipment.oven_available.oven_reserve(dish_id_in_broken_oven)
+            new_oven_object = await self.equipment.ovens.oven_reserve(dish_id_in_broken_oven)
             dish_object = await self.get_dish_object(dish_id_in_broken_oven)
             if oven_status == "reserved":
                 try:
@@ -344,7 +344,7 @@ class CookingMode(BaseMode):
                     await self.low_priority_queue.put(dish_object.throwing_away_chain_list)
             elif oven_status == "waiting_15" or "waiting_60":
                 pass
-        self.equipment.oven_available.oven_units[broken_oven_id].status = BROKEN_STATUS
+        self.equipment.ovens.oven_units[broken_oven_id].status = BROKEN_STATUS
         print("Мы обработали печь")
 
     async def qr_code_handler(self, params):
