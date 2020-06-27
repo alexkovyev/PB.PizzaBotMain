@@ -1,2 +1,4 @@
 /venv/
 /config/bot_token.txt
+/.idea/
+/try_some_code.py

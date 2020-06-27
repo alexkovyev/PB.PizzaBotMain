@@ -54,7 +54,7 @@ class PizzaBotMain(object):
             web.get("/api/commands/status", self.status_command),
             # web.post("/api/commands/stopping_cooking_mode", self.turn_off_cooking_mode_handler),
             web.post("/api/commands/full_system_testing", self.start_full_testing_handler),
-            # web.post("/api/commands/unit_testing"),,
+            web.post("/api/commands/unit_testing", self.start_unit_testing),
             # web.post(r"/api/commands/activation/{unit_id}"),
             # web.post(r"/api/commands/de-activation/{unit_id}"),
         ])
@@ -92,19 +92,32 @@ class PizzaBotMain(object):
         current_state = self.current_state
         return web.Response(text=current_state)
 
+    async def status_command(self, request):
+        print("Запрос на статус команды")
+        if not request.body_exists:
+            raise web.HTTPNoContent
+        request_body = await request.json()
+        command_uuid = request_body["command_uuid"]
+        try:
+            result = await self.get_futura_result(self.command_status[command_uuid])
+            if result == "200 OK":
+                self.command_status.pop(command_uuid)
+            return web.Response(text=result)
+        except KeyError:
+            raise web.HTTPBadRequest(text="uuid не найден")
+
     async def turn_cooking_mode_handler(self, request):
         """Этот метод обрабатывает запроса на включение режима готовки """
         print("Получили запрос на включение режима готовки")
         if self.current_state == COOKINGMODE or self.current_state == BEFORECOOKING:
-            await self.state_is_already_on_responce()
+            await self.responce_state_is_already_on()
 
         elif self.current_state == STANDBYMODE:
             response = await self.turn_any_mode(self.cooking_mode_start)
             return web.Response(text=response)
 
         elif self.current_state == TESTINGMODE:
-            print("Идет тестирование, включить не можем")
-            raise web.HTTPBadRequest(text="Идет тестирование, включить не можем")
+            await self.responce_state_is_busy(TESTINGMODE)
 
     async def turn_off_cooking_mode_handler(self, request):
         print("Получили запрос на включение режима готовки")
@@ -116,11 +129,25 @@ class PizzaBotMain(object):
             pass
 
         elif self.current_state == STANDBYMODE:
-            response = await self.turn_any_mode(self.testing_start)
+            params= {"testing_type": "FULL"}
+            response = await self.turn_any_mode(self.testing_start, params)
             return web.Response(text=response)
 
         elif self.current_state == TESTINGMODE:
-            await self.state_is_already_on_responce()
+            await self.responce_state_is_already_on()
+
+    async def start_unit_testing(self, request):
+        if self.current_state == STANDBYMODE:
+            if not request.body_exists:
+                raise web.HTTPNoContent
+            request_body = await request.json()
+            params = {"testing_type": "UNIT",
+                      "unit_type": request_body["unit_type"],
+                      "unit_id": request_body["unit_id"]}
+            response = await self.turn_any_mode(self.testing_start, params)
+            return web.Response(text=response)
+        else:
+            await self.responce_state_is_busy(self.current_state)
 
     # Schedule handlers
     async def turn_on_testing_mode(self, mode):
@@ -154,12 +181,20 @@ class PizzaBotMain(object):
             future.set_result("200 OK")
         await self.current_instance.cooking()
 
-    async def testing_start(self, future=None):
+    async def testing_start(self, future, *args):
         """ Это супер метод тестов"""
-        print("Запускаем тестирование, долгое")
         self.current_state = TESTINGMODE
         self.current_instance = TestingMode.TestingMode()
-        await asyncio.sleep(60)
+
+        if args[0]["testing_type"] == "FULL":
+            print("Запускаем тестирование, долгое")
+            await asyncio.sleep(60)
+
+        elif args[0]["testing_type"] == "UNIT":
+            print("Запускаем тестирование узла")
+            await asyncio.sleep(20)
+            print("Тестирование узла завершено")
+
         self.current_state = STANDBYMODE
         self.current_instance = StandByMode.StandBy()
         if future is not None and not future.cancelled():
@@ -181,36 +216,27 @@ class PizzaBotMain(object):
             my_result = "proceeding"
         return my_result
 
-    async def status_command(self, request):
-        print("Запрос на статус команды")
-        if not request.body_exists:
-            raise web.HTTPNoContent
-        request_body = await request.json()
-        command_uuid = request_body["command_uuid"]
-        try:
-            result = await self.get_futura_result(self.command_status[command_uuid])
-            if result == "200 OK":
-                self.command_status.pop(command_uuid)
-            return web.Response(text=result)
-        except KeyError:
-            raise web.HTTPBadRequest(text="uuid не найден")
-
     async def create_result_future(self):
         operation_result = asyncio.get_running_loop().create_future()
         operation_result_uuid = str(uuid.uuid4())
         self.command_status[operation_result_uuid] = operation_result
         return operation_result_uuid, operation_result
 
-    async def turn_any_mode(self, task_name):
+    async def turn_any_mode(self, task_name, *args):
         print("Ок, включаем")
         operation_result_uuid, operation_result = await self.create_result_future()
-        asyncio.create_task(task_name(operation_result))
+        asyncio.create_task(task_name(operation_result, *args))
         response = f"uuid:{operation_result_uuid}"
         return response
 
-    async def state_is_already_on_responce(self):
+    async def responce_state_is_already_on(self):
         print("Этот режим уже включен")
         raise web.HTTPNotAcceptable(text="Этот режим уже включен")
+
+    async def responce_state_is_busy(self, current_state):
+        message = f"Активирован режим {current_state}, включить не можем"
+        print(message)
+        raise web.HTTPBadRequest(text=message)
 
     #on_start_tasks
     async def create_hardware_broke_listener(self):
