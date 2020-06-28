@@ -1,8 +1,13 @@
+"""Это служебный модуль, имитирующий API контроллеров
+Написан для тестов работоспособности по-черному :) """
+
+
 import asyncio
 import random
 import time
 
 from pydispatch import Dispatcher
+
 
 """PBM использует следующие методы и объекты контроллеров:
 1. экземпляр класса ControllersEvents events_monitoring
@@ -45,7 +50,7 @@ async def event_generator(cntrls_events, equipment):
     """ PBM подписывается на следующие уведомления:
     - сканирование qr-code
     - изменение статуса следующего оборудования: печи, станция нарезки, узел упаковки, соусо-поливательная станция,
-    окна выдачи. АРСЕНИЙ! если будет еще оборудование, добавь пжста
+    окна выдачи.
     - необходимость провести мойку по причине накопления колво выполненных циклов
     Описание события см в описании метода
     """
@@ -61,9 +66,7 @@ async def event_generator(cntrls_events, equipment):
         cntrls_events.qr_scanned(params)
 
     async def hardware_status_changed(cntrls_events, equipment):
-        """ ВОПРОС ТРЕБУЕТ ОТВЕТА к контроллерам: по идее тут все оборудование. Вы просто выдаете идентификатор и статус
-        или будет еще тип: "oven", "cut_station", те {"equipment_type": cut_station,
-                                                      "uuid": o48932492834281}
+        """ {"equipment_type": cut_station, "uuid": o48932492834281}
         Приходят только уведомления о поломке, возобнавление работы через "оператора и перезагрузку"
         """
         print("Сработало событие ПОЛОМКА ПЕЧИ", time.time())
@@ -208,4 +211,3 @@ class Controllers(Movement):
     async def deliver_order(cls):
         """Метод запускает процедуру выдачи заказа и уведомления о том, получен ли заказ"""
         pass
-

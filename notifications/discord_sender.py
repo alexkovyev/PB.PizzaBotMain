@@ -1,50 +1,73 @@
+"""Этот модуль отправляет сообщения в Discord
+В Discord есть 2 текстовых канала для оператора и администратора."""
+
 import discord
 
-from config.config import DISCORD_TOKEN, DISCORD_TEMPLATES
+from config.config import (DISCORD_TOKEN,
+                           DISCORD_TEMPLATES,
+                           DISCORD_ADMIN_CHANNEL_NAME,
+                           DISCORD_OPERATOR_CHANNEL_NAME)
+
+
+operator_channel_name = DISCORD_OPERATOR_CHANNEL_NAME
+admin_channel_name = DISCORD_ADMIN_CHANNEL_NAME
 
 
 class DiscordBotAccess(discord.Client):
+    """Это основной класс клиента Discord"""
 
     def __init__(self):
         super().__init__()
         self.token = DISCORD_TOKEN
         self.receivers = {
-            "operator": {},
-            "admin": {}
+            operator_channel_name: {},
+            admin_channel_name: {}
         }
         self.message_templates = DISCORD_TEMPLATES
 
     async def on_ready(self):
-        """Event for launching client
-        Get admin and operator channels dinamically"""
+        """Этот метод подгружает данные каналов для отправки динамчески"""
 
         for channel in self.get_all_channels():
             if channel.type == discord.ChannelType.text:
                 name = channel.name
-                if name.find("operator") == 0:
-                    self.receivers["operator"][name] = channel.id
-                    print("Operator channel is got")
-                elif name.find("admin") == 0:
-                    self.receivers["admin"][name] = channel.id
-                    print("Admin channel is got")
-        print("Это получатели", self.receivers)
+                if name.find(operator_channel_name) == 0:
+                    self.receivers[operator_channel_name][name] = channel.id
+                    print("Канал оператора подключен")
+                elif name.find(admin_channel_name) == 0:
+                    self.receivers[admin_channel_name][name] = channel.id
+                    print("Канал админа подключен")
 
     async def form_message(self, message_code, message_data):
+        """Этот метод подставляет данные в шаблон и формирует текстовое сообщение
+        :param message_code: str
+        :param message_data: dict
+        """
         message = self.message_templates[message_code]['text'].format(**message_data)
         return message
 
     async def send_mesage(self, reciever, message):
+        """Этот метод отправляет сообщение в нужный канал
+        :param reciever: str
+        :param message: str
+        """
         channel_key = reciever
         channel = self.get_channel(self.receivers[reciever][channel_key])
         await channel.send(message)
 
     async def send_messages(self, message):
-        """The function allows to send a message in channels\n
-        Parameters:\n
-        A message code : string\n
-        Data : a dictionary of data for message template"""
-
-        print("Работает discord отправитель")
+        """Этот метод разбирает, в какие каналы нужно отправить сообщение,
+         запускает его формирование и отправку
+        :param message: dict вида
+                message = {
+                           "message_code": "out_of_stock",
+                           "message_data": {'id': '1',
+                                            'address': 'here',
+                                            'halfstaff_name': 'пельмени',
+                                             'N': '1',
+                                             'min_qt': '3'}
+                           }
+        """
 
         message_code, message_data = message
         message_code, message_data = message[message_code], message[message_data]
@@ -57,6 +80,5 @@ class DiscordBotAccess(discord.Client):
             print('Message is sent')
 
     async def start_working(self):
-        pass
-        # print("Начинаем цикл отправки сообщения")
-        # await self.start(self.token)
+        """Это основная функция запуска бота"""
+        await self.start(self.token)

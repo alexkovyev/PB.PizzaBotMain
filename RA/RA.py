@@ -1,3 +1,7 @@
+"""Это служебный модуль, имитирующий API робота-манипулятора
+Написан для тестов работоспособности по-черному :) """
+
+
 import asyncio
 import random
 import time
@@ -5,9 +9,7 @@ import time
 
 class RAError(Exception):
     """Класс ошибок RA"""
-
-    def __init__(self):
-        self.text = "Возникла ошибка RA"
+    pass
 
 
 # это просто эмуляция работы RA, необходимая для тестирования PBM
@@ -18,7 +20,7 @@ class Movement(object):
     async def movement(n):
         print("__ RA начал работу")
         await asyncio.sleep(n)
-        result = random.choice([True, True])
+        result = random.choice([True, False])
         print("__ Работа RA завершена")
         return result
 
@@ -35,7 +37,7 @@ class RA(Movement):
            to_place: srt
         :return: possible_duration (list[int])
         """
-        result_choice = random.choice([[5, 6, 3, 2, 1], [4, 5, 6, 3, 1], [4, 5, 6, 3, 1]])
+        result_choice = random.choice([[5, 6, 3, 2, 1], [4, 5, 6, 3, 1], [4, 5, 6, 3, 1], []])
         return result_choice
 
     @classmethod
