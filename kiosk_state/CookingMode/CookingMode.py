@@ -2,31 +2,30 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import time
-import random
 
 from functools import partial
 
-from kiosk_state.BaseMode import BaseMode
-from config.recipe_data import recipe_data
 from .BaseOrder import BaseOrder
 from .CookingModeErrors import OvenReserveFailed
-from server.custom_errors import OvenReservationError
-from RA.RA import RA
+from config.recipe_data import recipe_data
 from controllers.ControllerBus import Controllers
+from kiosk_state.BaseMode import BaseMode
+from RA.RA import RA
 from .recipe_class import Recipy
+from server.custom_errors import OvenReservationError
 
 
 class BeforeCooking(BaseMode):
 
     def __init__(self):
         super().__init__()
-        self.status = "getting_ready"
 
     @classmethod
     def start_testing(clx, equipment_data):
         """Тут вызываем методы контролеров по тестированию оборудования"""
-
-        # вызывается какой то супер метод контроллеров на проверку, возвращает status и dict с данными об оборудовании
+        # вызывается какой то супер метод контроллеров на проверку,
+        # возвращает status и dict с данными об оборудовании
+        # не сделано, заглушка
         is_equipment_ok = True
         print("Начинаем тестировать оборудования", time.time())
         time.sleep(10)
@@ -35,7 +34,9 @@ class BeforeCooking(BaseMode):
 
     @classmethod
     def parse_recipes(clx):
-        """Парсит все рецепты в директории и возвращает словарь вида: описать"""
+        """Парсит все рецепты в директории и возвращает словарь вида:
+        не сделано, заглушка
+        """
         print("Начинаем парсить рецепты", time.time())
         time.sleep(10)
         print("Рецепты спарсены", time.time())
@@ -44,6 +45,8 @@ class BeforeCooking(BaseMode):
 
     @classmethod
     async def start_pbm(clx, equipment_data):
+        """Этот метод запускает режим готовки. Так как это блокирующие операции,
+        используется run_in_executor"""
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
         my_loop = asyncio.get_running_loop()
         async def task_1(equipment_data):
@@ -61,6 +64,17 @@ class BeforeCooking(BaseMode):
 
 
 class CookingMode(BaseMode):
+    """Это основной режим готовки
+    self.recipes - это словарь, содержащий спарсенные данные рецепта
+
+    self.equipment - это текщий экземпляр класса Equipment
+
+    self.current_orders_proceed - это словарь, содержащий все заказы за текущий сеанс работы
+
+    self.orders_requested_for_delivery - это словарь, содержащий все заказы, по которым поучатель
+                                         просканировал qr код
+    """
+
     STOP_STATUS = "failed_to_be_cooked"
 
     def __init__(self, recipes, equipment):
@@ -69,7 +83,7 @@ class CookingMode(BaseMode):
         self.equipment = equipment
         self.current_orders_proceed = {}
         self.orders_requested_for_delivery = {}
-        # разные полезные очереди
+        # разные полезные очереди по приоритету
         self.main_queue = asyncio.Queue()
         self.high_priority_queue = asyncio.Queue()
         self.low_priority_queue = asyncio.Queue()
@@ -110,6 +124,8 @@ class CookingMode(BaseMode):
                              }
                      }
                      }
+
+        Это метод - заглушка, так как БД пока нет
         """
         new_order = dict(refid=new_order_id, dishes={"40576654-9f31-11ea-bb37-0242ac130002":
             {
@@ -193,14 +209,14 @@ class CookingMode(BaseMode):
             # print("составили рецепт соуса", dish["sauce"])
 
         async def create_filling_recipe(self, dish):
-            """Этот метод выбирает рецепт начинки для начинки в общем и для каждого компонента начинки в целом"""
+            """Этот метод выбирает рецепт начинки для начинки в общем
+            и для каждого компонента начинки в целом"""
             filling_id = dish["filling"]["id"]
             dough_id = dish["dough"]["id"]
             dish["filling"]["cooking_program"] = self.recipes["filling"][filling_id]["cooking_program"][dough_id]
             dish["filling"]["make_crust_program"] = self.recipes["filling"][filling_id]["make_crust_program"][dough_id]
             dish["filling"]["pre_heating_program"] = self.recipes["filling"][filling_id]["pre_heating_program"][dough_id]
             dish["filling"]["stand_by"] = self.recipes["filling"][filling_id]["stand_by_program"][dough_id]
-            # dish["filling"]["chain"] = self.recipes["filling"][filling_id]["chain"]
             halfstaff_content = dish["filling"]["content"]
             cutting_program = self.recipes["filling"][filling_id]["cutting_program"]
             dish["filling"]["content"] = [list(_) for _ in (zip(halfstaff_content, cutting_program))]
@@ -254,21 +270,21 @@ class CookingMode(BaseMode):
             await queue.put(chain)
 
     async def unpack_chain_data(self, queue, params=None):
+        """Этот метод распаковывает кортеж, проверяет можно ли готовить блюдо
+        (те статус блюда не STOP_STATUS) и запускает чейн с параметрами """
         print("Начинаем распаковку")
         chain_to_do = await queue.get()
         if isinstance(chain_to_do, tuple):
             chain_to_do, params = chain_to_do
         if chain_to_do.__self__.status != self.STOP_STATUS:
             print("Готовим блюдо", chain_to_do.__self__.id)
-            print(chain_to_do.__self__.oven_unit)
             await chain_to_do(params, self)
 
     async def cooking(self):
-        """Эта курутина обеспеивает вызов методов по приготовлению блюд и другой важной работе"""
+        """Эта курутина обеспечивает вызов методов по приготовлению блюд и другой важной работе"""
 
         while True:
             print("Работает cooking", time.time())
-            print(self.equipment.ovens.oven_units)
             if self.is_downtime:
                 print("Танцуем, других заданий нет")
                 await RA.dance()
@@ -283,49 +299,41 @@ class CookingMode(BaseMode):
                     print("Моем или выкидываем пиццу")
 
     async def broken_equipment_handler(self, event_params, equipment):
+        """Этот метод обрабатывает поломки оборудования, поступающий на event_listener
+        :param event_params: dict вида {unit_type: str, unit_id: uuid}
+        """
         print("Обрабатываем уведомление об поломке оборудования", time.time())
         BROKEN_STATUS = "broken"
         unit_type = event_params["unit_type"]
         unit_id = event_params["unit_name"]
-        print("Это тип оборудования", unit_type)
         try:
             if unit_type != "ovens":
                 print("Меняем данные оборудования")
                 getattr(equipment, unit_type)[unit_id] = False
-                print(equipment)
             else:
                 print("Меняем данные печи")
                 await self.broken_oven_handler(unit_id)
         except KeyError:
             print("Ошибка данных оборудования")
 
-    #
-    # async def broken_equipment_handler(self, event_data):
-    #     print("Обрабатываем уведомление об поломке оборудования", time.time())
-    #     oven_id = int(event_data["unit_name"])
-    #     oven_status = event_data["status"]
-    #     # начало симуляции работы
-    #     oven_id = random.choice(list(self.equipment.ovens.oven_units.keys()))
-    #     print("Сломалась печь", oven_id)
-    #     await self.broken_oven_handler(oven_id)
-    #     print("Обработали", oven_id, oven_status)
-
     async def get_dish_status(self, dish_id):
+        """Этот метод получает статус блюда  по заданному ID"""
         for order in self.current_orders_proceed:
             for dish in order:
                 if dish.id == dish_id:
                     return dish.status
 
     async def get_dish_object(self, dish_id):
+        """Этот метод возращает экземпляр класса блюда по заданному ID"""
         for order in self.current_orders_proceed.values():
             for dish in order.dishes:
                 if dish.id == dish_id:
                     return dish
 
     async def change_oven_in_dish(self, dish_object, new_oven_object):
-        """
-        :param dish_id:
-        :param new_oven:
+        """ Этот метод переназнаает печь в блюде
+        :param dish_object: объект блюда
+        :param new_oven_object: объект печи
         :return: dish instance BaseDish class
         """
         dish_object.oven_unit = new_oven_object
@@ -361,6 +369,7 @@ class CookingMode(BaseMode):
                     print("Запустить ликвидацю блюда")
                     await self.low_priority_queue.put(dish_object.throwing_away_chain_list)
             elif oven_status == "waiting_15" or "waiting_60":
+                # не сделано
                 pass
         self.equipment.ovens.oven_units[broken_oven_id].status = BROKEN_STATUS
         print("Мы обработали печь")
@@ -376,16 +385,16 @@ class CookingMode(BaseMode):
             print("Ошибка ключа, что делать?")
         set_mode_param = await self.evaluation_status_to_set_mode(order_check_code)
         if set_mode_param == "ready":
-            # нужно ли промежуточное звено?
             self.orders_requested_for_delivery[order_check_code] = order_check_code
             asyncio.create_task(self.delivery_request_handler(order_check_code))
             self.current_orders_proceed[order_check_code].pickup_point = pickup_point
         await Controllers.set_pickup_point_mode(set_mode_param, pickup_point)
+        # не доделано
         # await self.high_priority_queue.put(qr_code_data)
 
     async def evaluation_status_to_set_mode(self, order_check_code):
-        """Передает контроллу значение, на основании которого пользователю выводится информация о заказе
-        ПРОВЕРИТЬ СТАТУСЫ блюда !!!!!!!!!
+        """Передает контроллу значение, на основании которого пользователю
+        выводится информация о заказе на экране пункта выдачи
         """
         CNTRLS_SET_MODE_OPTIONS = {1: "not_found",
                                    2: "in_progress",
@@ -413,3 +422,4 @@ class CookingMode(BaseMode):
         ДОБАВИТЬ ОЧИСТКУ поля ПЕЧЬ после упаковке --> oven_unit = None"""
         for dish in self.current_orders_proceed[order_check_code].dishes:
             print("Вот это блюдо выдаем",dish)
+            # не сделано

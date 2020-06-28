@@ -1,5 +1,8 @@
+"""Это базовый класс режима работы
+не доделано
+"""
+
 class BaseMode(object):
-    # переделать на фабрику
     def __init__(self):
         self.is_busy = False
 

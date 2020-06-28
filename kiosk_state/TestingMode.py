@@ -1,3 +1,7 @@
+"""Это описание метода Testing
+не доделано
+"""
+
 from .BaseMode import BaseMode
 
 

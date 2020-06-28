@@ -1,6 +1,4 @@
 """Этот модуль содержит информацию об оборудовании"""
-import asyncio
-import time
 
 from server.custom_errors import NoFreeOvenError, OvenReservationError
 

@@ -347,6 +347,8 @@ class PizzaBotMain(object):
             print("Можем ли готовить", self.is_able_to_cook)
 
     async def get_equipment_data(self):
+        """Это метод - заглушка, который имитрует подключение к БД и получение данных
+        об оборудовании"""
         await asyncio.sleep(10)
         oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
         equipment_data = {
@@ -376,6 +378,7 @@ class PizzaBotMain(object):
         self.equipment = Equipment(equipment_data)
 
     async def send_message(self):
+        """Это метод-заглушка для тестирования работоспособности отпавки сообщений в Discord """
         message = {
             "message_code": "out_of_stock",
             "message_data": {'id': '1',
@@ -386,41 +389,16 @@ class PizzaBotMain(object):
         }
         await self.messages_for_sending.put(message)
 
-    def get_equipment_data(self):
-        oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
-        equipment_data = {
-            "ovens": {i: {"oven_id": i, "status": "free"} for i in oven_ids},
-            "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
-            "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
-            "sauce_dispensers": {"16ffcee8-2130-4a2f-b71d-469ee65d42d0": True,
-                                 "ab5065e3-93aa-4313-869e-50a959458439": True,
-                                 "28cc0239-2e35-4ccd-9fcd-be2155e4fcbe": True,
-                                 "1b1af602-b70f-42a3-8b5d-3112dcf82c26": True,
-                                 },
-            "dough_dispensers": {"ebf29d04-023c-4141-acbe-055a19a79afe": True,
-                                 "2e84d0fd-a71f-4988-8eee-d0373c0bc609": True,
-                                 "68ec7c16-f57b-43c0-b708-dfaea5c2e1dd": True,
-                                 "75355f3c-bf05-405d-98af-f04bcba7d7e4": True,
-                                 },
-            "pick_up_points": {"1431f373-d036-4e0f-b059-70acd6bd18b9": True,
-                               "b7f96101-564f-4203-8109-014c94790978": True,
-                               "73b194e1-5926-45be-99ec-25e1021b96f7": True,
-                               }
-        }
-        return equipment_data
-
-    def add_equipment_data(self):
-        """Этот метод запускает сбор данных об оборудовании из БД и создает экземпляр класса Equipment"""
-        equipment_data = self.get_equipment_data()
-        self.equipment = Equipment(equipment_data)
-
     async def is_able_to_cook_monitoring(self):
+        """Это фоновая задача, отслеживающая можно ли готовитт"""
         while True:
             if not self.is_able_to_cook:
                 print("Готовить не можем, выключаем систему")
+                # не сделано
             await asyncio.sleep(3)
 
     async def message_sending_worker(self):
+        """Это фоновая задача - отправитель уведомлений"""
 
         while True:
             if not self.messages_for_sending.empty():
@@ -441,9 +419,10 @@ class PizzaBotMain(object):
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
         is_able_to_cook_monitor = asyncio.create_task(self.is_able_to_cook_monitoring())
         discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
-        test = asyncio.create_task(self.message_sending_worker())
+        message_monitoring = asyncio.create_task(self.message_sending_worker())
 
-        await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor, discord_sender, test)
+        await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor,
+                             discord_sender, message_monitoring, on_start_tasks)
 
     def start_server(self):
         """Это основай метод запуска работы приложения"""

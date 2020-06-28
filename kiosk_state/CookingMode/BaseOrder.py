@@ -14,7 +14,6 @@ class BaseOrder(object):
 
         self.ref_id = new_order["refid"]
         self.dishes = self.dish_creation(new_order["dishes"], ovens_reserved)
-        print("Это печи при создании заказа")
         self.status = "received"
         self.pickup_point = None
         self.is_order_ready_monitoring = []
@@ -27,6 +26,7 @@ class BaseOrder(object):
         return self.dishes
 
     async def create_is_order_ready_monitoring(self):
+        """Этот метод создает мониторинг готовности блюд заказа через asyncio.Event """
         for dish in self.dishes:
             is_dish_ready = asyncio.Event()
             dish.is_dish_ready = is_dish_ready
@@ -34,55 +34,12 @@ class BaseOrder(object):
         return self.is_order_ready_monitoring
 
     async def order_readiness_monitoring(self):
+        """Этот метод проверяет, сработали ли события готовности блюд в заказе"""
         while not all(list(map(lambda i: i.is_set(), self.is_order_ready_monitoring))):
             await asyncio.sleep(1)
         print("Сработало событие ЗАКАЗ ГОТОВ", time.time())
         self.status = "ready"
         # записать в БД статус
-
-    # Алина код
-    def change_status(self, new_status):
-        """Метод для смены статуса заказа
-        Возвращается true, если смена статуса прошла успешно, и false, если такой статус не прдусмотрен
-        Вызывается после метода can_change"""
-        if new_status in self.ORDER_STATUS:
-            self.status = new_status
-            return True
-        return False
-
-    # Алина код
-    def can_change(self, new_status):
-        """Метод, который проверяет, можно ли изменить статус заказа на new_status
-        Возвращается true, если сменить можно, и false, если статусы блюд не соответствуют новому статусу заказа"""
-        SAME_STATUS = ["ready", "packed", "wait to delivery", "failed_to_be_cooked", "time_is_up"]
-        if len(self.dishes) == 1:
-            if new_status in SAME_STATUS:
-                if self.dishes[0].status == new_status:
-                    return True
-                return False
-            elif new_status == "cooking":
-                if self.dishes[0].status == "cooking":
-                    return True
-                return False
-            else:
-                return True
-        else:  # для двух блюд в заказе:
-            if new_status in SAME_STATUS:
-                if self.dishes[0].status == self.dishes[1].status == new_status:
-                    return True
-            else:
-                if new_status == "partially_ready":
-                    if (self.dishes[0].status == "ready" or self.dishes[1].status == "ready") and \
-                            (self.dishes[0].status == "failed_to_be_cooked" or self.dishes[1].status
-                             == "failed_to_be_cooked"):
-                        return True
-                    return False
-                elif new_status == "cooking":
-                    if self.dishes[0].status == "cooking" or self.dishes[1].status == "cooking":
-                        return True
-                    return False
-                else:
-                    return True
 
     def __repr__(self):
         return f"Заказ № {self.ref_id}"
@@ -96,11 +53,12 @@ class BaseDish(Recipy):
     - baking: пицца находится в печи на выпечке
     - ready: пицца выпечена
     - packing: начата упаковка
-    , "failed_to_be_cooked",
-                     "packed", "wait to delivery", "time_is_up"
+    - failed_to_be_cooked: боюдо не приготовлено
+    - packed: блюдо упаковано
+    - time_is_up: блюдо не забрали, выбрашено
     """
     DISH_STATUSES = ["received", "cooking", "baking", "failed_to_be_cooked", "ready",
-                     "packed", "wait to delivery", "time_is_up"]
+                     "packed", "time_is_up"]
     STOP_STATUS = "failed_to_be_cooked"
 
     def __init__(self, dish_id, dish_data, free_oven_id):
@@ -128,6 +86,7 @@ class BaseDish(Recipy):
 
     async def half_staff_cell_evaluation(self):
         """Этот метод назначает п\ф из БД"""
+        # не сделано
         pass
 
     def __repr__(self):
@@ -136,12 +95,11 @@ class BaseDish(Recipy):
 
 
 class BasePizzaPart(object):
-    """Базовый класс компонента пиццы.
-    self.halfstuff_id идентификационный номер полуфабриката
-    self.halfstuff_cell: строка, передаваемая robotic Arm или контроллерам 'ячейка A1 3 из 6'
-    считаем, что за искл начинки всего по 1 порции (указано в portion_qt"""
+    """Базовый класс компонента пиццы"""
 
     def cell_evaluation(self):
+        """Это метод обращается к БД, находит где лежит нужный п\ф"""
+        # не сделано
         pass
 
 
@@ -165,7 +123,6 @@ class BaseSauce(BasePizzaPart):
         self.sauce_id = sauce_data["id"]
         self.sauce_content = sauce_data["content"]
         # sauce_cell=[(1, 1), (2, 2)] 0 - id насосной станции, 1 - программа запуска
-        # переписать название
         self.sauce_cell = self.unpack_data(sauce_data)
         self.sauce_recipe = sauce_data["recipe"]
 
@@ -183,7 +140,7 @@ class BaseSauce(BasePizzaPart):
 
 class BaseFilling(object):
     """Этот класс содержит информацию о начинке.
-    filling_data["content"] содержит кортеж котреж словарей
+    filling_data["content"] содержит кортеж словарей
     Вложенный словарь содержит информцию об id_пф и словарь для нарезки
     (halfstaff_id, {"cutting_program_id":str, "duration": int})
     """
@@ -192,12 +149,14 @@ class BaseFilling(object):
         self.filling_id = filling_data["id"]
         self.filling_content = filling_data["content"]
         self.cell_data_unpack()
-        # self.filling_parts = self.create_filling_parts(filling_data["content"])
 
     def cell_data_unpack(self):
-        """Элемент списка начинки выглядит вот так, последний элемент - это место хранения
+        """Это метод - загрушка, который как бы получает данные о местах хранения п\ф в начинке
+        # не сделано
+
+        Элемент списка начинки выглядит вот так, последний элемент - это место хранения
         [tomato, {'program_id': 2, 'duration': 10}, ('d4', (3, 4))]"""
-        # место хранения в холодьнике
+        # место хранения в холодильнике
         input_data = (
             ("d4", (3, 4)), ("a4", (3, 4)), ("t4", (3, 4)),
             ("b4", (1, 1)), ("a4", (1, 1)), ("c4", (2, 1))
@@ -205,27 +164,9 @@ class BaseFilling(object):
 
         self.filling_content = [item + [value] for item, value in zip(self.filling_content, input_data)]
 
-
-    # def create_filling_parts(self, filling_data):
-    #     new_list = []
-    #     for filling_part in filling_data:
-    #         filling_part_id, recipe_program = filling_part
-    #         item = BaseFillingPart(filling_part_id, recipe_program)
-    #         new_list.append(item)
-    #     return new_list
-
     def __repr__(self):
         return f"Начинка {self.filling_id}"
 
-
-# class BaseFillingPart(Recipy):
-#     def __init__(self, product_id, cutting_program):
-#         self.filling_part_id = product_id
-#         self.cutting_recipe = cutting_program["program_id"]
-#         self.cutting_duration = cutting_program["duration"]
-#         # сделать назначение п-ф
-#         self.fridge_container = "d4"
-#         self.fridge_location = (3, 4)
 
 class BaseAdditive(BasePizzaPart):
     """Этот класс описывает добавку"""
