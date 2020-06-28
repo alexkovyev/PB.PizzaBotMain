@@ -282,15 +282,33 @@ class CookingMode(BaseMode):
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
 
-    async def broken_equipment_handler(self, event_data):
+    async def broken_equipment_handler(self, event_params, equipment):
         print("Обрабатываем уведомление об поломке оборудования", time.time())
-        oven_id = int(event_data["unit_name"])
-        oven_status = event_data["status"]
-        # начало симуляции работы
-        oven_id = random.choice(list(self.equipment.ovens.oven_units.keys()))
-        print("Сломалась печь", oven_id)
-        await self.broken_oven_handler(oven_id)
-        print("Обработали", oven_id, oven_status)
+        BROKEN_STATUS = "broken"
+        unit_type = event_params["unit_type"]
+        unit_id = event_params["unit_name"]
+        print("Это тип оборудования", unit_type)
+        try:
+            if unit_type != "ovens":
+                print("Меняем данные оборудования")
+                getattr(equipment, unit_type)[unit_id] = False
+                print(equipment)
+            else:
+                print("Меняем данные печи")
+                await self.broken_oven_handler(unit_id)
+        except KeyError:
+            print("Ошибка данных оборудования")
+
+    #
+    # async def broken_equipment_handler(self, event_data):
+    #     print("Обрабатываем уведомление об поломке оборудования", time.time())
+    #     oven_id = int(event_data["unit_name"])
+    #     oven_status = event_data["status"]
+    #     # начало симуляции работы
+    #     oven_id = random.choice(list(self.equipment.ovens.oven_units.keys()))
+    #     print("Сломалась печь", oven_id)
+    #     await self.broken_oven_handler(oven_id)
+    #     print("Обработали", oven_id, oven_status)
 
     async def get_dish_status(self, dish_id):
         for order in self.current_orders_proceed:

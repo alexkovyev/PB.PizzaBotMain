@@ -33,3 +33,4 @@ DISCORD_TEMPLATES = {
                     'receivers': ('operator', 'admin')
                 }
             }
+

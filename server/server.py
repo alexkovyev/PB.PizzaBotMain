@@ -12,7 +12,6 @@ from controllers.ControllerBus import ControllersEvents, event_generator
 from kiosk_state.CookingMode import CookingMode
 from kiosk_state import StandByMode, TestingMode
 from notifications.discord_sender import DiscordBotAccess
-from logs.logs import PBlogs
 from server.equipment import Equipment
 
 
@@ -186,7 +185,6 @@ class PizzaBotMain(object):
             print("ОШИБКА ОБОРУДОВАНИЯ")
             self.equipment = await self.add_equipment_data()
         (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
-        await asyncio.sleep(20)
         self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
         self.current_state = COOKINGMODE
         if future is not None and not future.cancelled():
