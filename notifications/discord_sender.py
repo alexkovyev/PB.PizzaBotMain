@@ -1,4 +1,3 @@
-import asyncio
 import discord
 
 from config.config import DISCORD_TOKEN, DISCORD_TEMPLATES
@@ -14,7 +13,6 @@ class DiscordBotAccess(discord.Client):
             "admin": {}
         }
         self.message_templates = DISCORD_TEMPLATES
-        self.messages_send = {}
 
     async def on_ready(self):
         """Event for launching client
@@ -35,7 +33,7 @@ class DiscordBotAccess(discord.Client):
         message = self.message_templates[message_code]['text'].format(**message_data)
         return message
 
-    async  def send_mesage(self, reciever, message):
+    async def send_mesage(self, reciever, message):
         channel_key = reciever
         channel = self.get_channel(self.receivers[reciever][channel_key])
         await channel.send(message)
@@ -59,5 +57,6 @@ class DiscordBotAccess(discord.Client):
             print('Message is sent')
 
     async def start_working(self):
-        print("Начинаем цикл отправки сообщения")
-        await self.start(self.token)
+        pass
+        # print("Начинаем цикл отправки сообщения")
+        # await self.start(self.token)

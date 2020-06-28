@@ -6,9 +6,8 @@ COOKINGMODE = "cooking_mode"
 TESTINGMODE = "testing_mode"
 BEFORECOOKING = "before_cooking"
 
-SCHEDULE = {
-
-}
+# в теле запроса от SS
+NEW_ORDER_ID_KEY = "check_code"
 
 #время в мин до ликвидации заказа после информирования о готовности
 OVEN_LIQUIDATION_TIME = 60
@@ -21,7 +20,6 @@ HALF_STAFF_CHECK_TIME = 60
 
 with open("config/bot_token.txt") as bot_token:
     DISCORD_TOKEN = bot_token.read().strip()
-    print(DISCORD_TOKEN)
 
 DISCORD_TEMPLATES = {
                 'end_of_shelf_life': {
@@ -32,6 +30,6 @@ DISCORD_TEMPLATES = {
                 'out_of_stock': {
                     'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта {"
                             "halfstaff_name} при мин остатке {min_qt}.",
-                    'receivers': ('operator',)
+                    'receivers': ('operator', 'admin')
                 }
             }

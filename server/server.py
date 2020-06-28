@@ -6,8 +6,8 @@ import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config.config import (SERVER_HOST, SERVER_PORT,
-                           STANDBYMODE, BEFORECOOKING, COOKINGMODE, TESTINGMODE)
+from config.config import (SERVER_HOST, SERVER_PORT, STANDBYMODE, BEFORECOOKING, COOKINGMODE, TESTINGMODE,
+                           NEW_ORDER_ID_KEY)
 from controllers.ControllerBus import ControllersEvents, event_generator
 from kiosk_state.CookingMode import CookingMode
 from kiosk_state import StandByMode, TestingMode
@@ -69,7 +69,8 @@ class PizzaBotMain(object):
         if not request.body_exists:
             raise web.HTTPNoContent
         request_body = await request.json()
-        new_order_id = request_body["check_code"]
+        new_order_id = request_body[NEW_ORDER_ID_KEY]
+        # new_order_id = request_body["check_code"]
         can_receive_new_order = await self.is_open_for_new_orders()
         if can_receive_new_order:
             try:
@@ -130,7 +131,7 @@ class PizzaBotMain(object):
             pass
 
         elif self.current_state == STANDBYMODE:
-            params= {"testing_type": "FULL"}
+            params = {"testing_type": "FULL"}
             response = await self.turn_any_mode(self.testing_start, params)
             await self.send_message()
             return web.Response(text=response)
@@ -273,7 +274,7 @@ class PizzaBotMain(object):
         print("Это упаковка", is_package_station_ok)
         self.is_able_to_cook = True if (is_cut_station_ok and is_package_station_ok) else False
 
-    #on_start_tasks
+    # on_start_tasks
     async def create_hardware_broke_listener(self):
         """Этот метод запускает бесконечный таск, который отслеживает наступление событий
          поломки оборудования"""
@@ -362,11 +363,13 @@ class PizzaBotMain(object):
             await asyncio.sleep(3)
 
     async def message_sending_worker(self):
-        while True:
-            if not self.messages_for_sending.empty():
-                message_to_send = await self.messages_for_sending.get()
-                await self.discord_bot_client.send_messages(message_to_send)
-            await asyncio.sleep(1)
+
+        pass
+        # while True:
+        #     if not self.messages_for_sending.empty():
+        #         message_to_send = await self.messages_for_sending.get()
+        #         await self.discord_bot_client.send_messages(message_to_send)
+        #     await asyncio.sleep(1)
 
     async def create_on_start_tasks(self, app, scheduler):
         """Этот метод запускает сервер, планировщик и фоновые задачи, запускаемые на старте"""
