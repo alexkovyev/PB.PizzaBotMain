@@ -21,3 +21,17 @@ HALF_STAFF_CHECK_TIME = 60
 
 with open("config/bot_token.txt") as bot_token:
     DISCORD_TOKEN = bot_token.read().strip()
+    print(DISCORD_TOKEN)
+
+DISCORD_TEMPLATES = {
+                'end_of_shelf_life': {
+                    'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта "
+                            "{halfstaff_name} при мин остатке {min_qt}.",
+                    'receivers': ('operator', 'admin')
+                },
+                'out_of_stock': {
+                    'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта {"
+                            "halfstaff_name} при мин остатке {min_qt}.",
+                    'receivers': ('operator',)
+                }
+            }

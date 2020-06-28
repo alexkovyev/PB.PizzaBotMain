@@ -1,7 +1,7 @@
 import asyncio
 import discord
 
-from config.config import DISCORD_TOKEN
+from config.config import DISCORD_TOKEN, DISCORD_TEMPLATES
 
 
 class DiscordBotAccess(discord.Client):
@@ -13,24 +13,13 @@ class DiscordBotAccess(discord.Client):
             "operator": {},
             "admin": {}
         }
-        self.bot_config = {
-            'message_templates': {
-                'end_of_shelf_life': {
-                    'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта "
-                            "{halfstaff_name} при мин остатке {min_qt}.",
-                    'receivers': ('operator', 'admin')
-                },
-                'out_of_stock': {
-                    'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта {"
-                            "halfstaff_name} при мин остатке {min_qt}.",
-                    'receivers': ('operator',)
-                }
-            },
-        }
+        self.message_templates = DISCORD_TEMPLATES
+        self.messages_send = {}
 
     async def on_ready(self):
         """Event for launching client
         Get admin and operator channels dinamically"""
+
         for channel in self.get_all_channels():
             if channel.type == discord.ChannelType.text:
                 name = channel.name
@@ -41,24 +30,32 @@ class DiscordBotAccess(discord.Client):
                     self.receivers["admin"][name] = channel.id
                     print("Admin channel is got")
         print("Это получатели", self.receivers)
-        # await self.send("message", "dev", True)
 
-    async def send_messages(self, message_code, data):
+    async def form_message(self, message_code, message_data):
+        message = self.message_templates[message_code]['text'].format(**message_data)
+        return message
+
+    async  def send_mesage(self, reciever, message):
+        channel_key = reciever
+        channel = self.get_channel(self.receivers[reciever][channel_key])
+        await channel.send(message)
+
+    async def send_messages(self, message):
         """The function allows to send a message in channels\n
         Parameters:\n
         A message code : string\n
         Data : a dictionary of data for message template"""
 
         print("Работает discord отправитель")
-        async def form_message(reciever, data):
-            # channel_key = reciever + '_' + point_key
-            channel_key = reciever
-            channel = self.get_channel(self.receivers[reciever][channel_key])
-            await channel.send(self.bot_config['message_templates'][message_code]['text'].format(**data))
 
-        for receiver in self.bot_config['message_templates'][message_code]['receivers']:
+        message_code, message_data = message
+        message_code, message_data = message[message_code], message[message_data]
+
+        message = await self.form_message(message_code, message_data)
+
+        for receiver in self.message_templates[message_code]['receivers']:
             print(f'Message is sending to {receiver}')
-            await form_message(receiver, data)
+            await self.send_mesage(receiver, message)
             print('Message is sent')
 
     async def start_working(self):

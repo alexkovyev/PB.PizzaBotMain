@@ -27,6 +27,7 @@ class PizzaBotMain(object):
         self.is_able_to_cook = True
         self.current_instance = StandByMode.StandBy()
         self.discord_bot_client = DiscordBotAccess()
+        self.messages_for_sending = asyncio.Queue()
 
     def create_server(self):
         """Этот метод создает приложение aiohttp сервера, а также привязывает routes api
@@ -131,6 +132,7 @@ class PizzaBotMain(object):
         elif self.current_state == STANDBYMODE:
             params= {"testing_type": "FULL"}
             response = await self.turn_any_mode(self.testing_start, params)
+            await self.send_message()
             return web.Response(text=response)
 
         elif self.current_state == TESTINGMODE:
@@ -315,9 +317,15 @@ class PizzaBotMain(object):
     #     self.equipment = Equipment(equipment_data)
 
     async def send_message(self):
-        message_code = "out_of_stock"
-        data = {'id': '1', 'address': 'here', 'halfstaff_name': 'пельмени', 'N': '3', 'min_qt': '1'}
-        await self.discord_bot_client.send_messages(message_code, data)
+        message = {
+            "message_code": "out_of_stock",
+            "message_data": {'id': '1',
+                              'address': 'here',
+                              'halfstaff_name': 'пельмени',
+                              'N': '1',
+                              'min_qt': '3'}
+        }
+        await self.messages_for_sending.put(message)
 
     def get_equipment_data(self):
         oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
@@ -353,10 +361,12 @@ class PizzaBotMain(object):
                 print("Готовить не можем, выключаем систему")
             await asyncio.sleep(3)
 
-    async def test_worker(self):
+    async def message_sending_worker(self):
         while True:
-            await asyncio.sleep(20)
-            await self.send_message()
+            if not self.messages_for_sending.empty():
+                message_to_send = await self.messages_for_sending.get()
+                await self.discord_bot_client.send_messages(message_to_send)
+            await asyncio.sleep(1)
 
     async def create_on_start_tasks(self, app, scheduler):
         """Этот метод запускает сервер, планировщик и фоновые задачи, запускаемые на старте"""
@@ -371,7 +381,7 @@ class PizzaBotMain(object):
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
         is_able_to_cook_monitor = asyncio.create_task(self.is_able_to_cook_monitoring())
         discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
-        test = asyncio.create_task(self.test_worker())
+        test = asyncio.create_task(self.message_sending_worker())
 
         await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor, discord_sender, test)
 
