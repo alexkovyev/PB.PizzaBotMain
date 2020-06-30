@@ -10,18 +10,18 @@ class BaseOrder(object):
     ORDER_STATUS = ["received", "cooking", "ready", "packed", "wait to delivery", "delivered", "closed",
                     "failed_to_be_cooked", "not_delivered"]
 
-    def __init__(self, new_order, ovens_reserved):
+    def __init__(self, new_order, ovens_reserved, time_changes_event):
 
         self.ref_id = new_order["refid"]
-        self.dishes = self.dish_creation(new_order["dishes"], ovens_reserved)
+        self.dishes = self.dish_creation(new_order["dishes"], ovens_reserved, time_changes_event)
         self.status = "received"
         self.pickup_point = None
         self.is_order_ready_monitoring = []
 
-    def dish_creation(self, dishes, ovens_reserved):
+    def dish_creation(self, dishes, ovens_reserved, time_changes_event):
         """Creates list of dishes objects in order"""
 
-        self.dishes = [BaseDish(dish_id, dishes[dish_id], ovens_reserved[index])
+        self.dishes = [BaseDish(dish_id, dishes[dish_id], ovens_reserved[index], time_changes_event)
                        for index, dish_id in enumerate(dishes)]
         return self.dishes
 
@@ -61,7 +61,7 @@ class BaseDish(Recipy):
                      "packed", "time_is_up"]
     STOP_STATUS = "failed_to_be_cooked"
 
-    def __init__(self, dish_id, dish_data, free_oven_id):
+    def __init__(self, dish_id, dish_data, free_oven_id, time_changes_event):
         super().__init__()
         self.id = dish_id
         # распаковываем данные о том, из чего состоит блюдо
@@ -83,6 +83,7 @@ class BaseDish(Recipy):
         # у каждой ячейки выдачи есть 2 "лотка", нужно распределить в какой лоток помещает блюдо
         self.pickup_point_unit: int
         self.is_dish_ready = None
+        self.time_changes_event = time_changes_event
 
     async def half_staff_cell_evaluation(self):
         """Этот метод назначает п\ф из БД"""

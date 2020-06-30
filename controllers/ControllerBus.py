@@ -89,7 +89,8 @@ async def event_generator(cntrls_events, equipment):
                                "73b194e1-5926-45be-99ec-25e1021b96f7": True,
                                }
         }
-        unit_type = random.choice(["ovens", "cut_station", "package_station", "sauce_dispensers"])
+        unit_type = random.choice(["cut_station", "package_station", "sauce_dispensers"])
+        # unit_type = random.choice(["ovens", "cut_station", "package_station", "sauce_dispensers"])
         if unit_type != "ovens":
             unit_id = random.choice(list(data[unit_type].keys()))
         else:
@@ -112,7 +113,7 @@ async def event_generator(cntrls_events, equipment):
         my_choice = random.randint(0, 2)
         what_happened = options[my_choice]
         await what_happened(cntrls_events, equipment)
-        n = random.randint(10, 20)
+        n = random.randint(40, 80)
         print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
         await asyncio.sleep(n)
         print("Trouble-maker снова с нами", time.time())
@@ -167,7 +168,7 @@ class Controllers(Movement):
         return result
 
     @classmethod
-    async def start_baking(cls, oven_unit, oven_mode, program, time_changes_requset):
+    async def start_baking(cls, oven_unit, oven_mode, program, time_changes_requset, operations_result_futura):
         """Запускает выпечку в конкртеной печи
         :param oven_unit: uuid4
                oven_mode: str
@@ -185,13 +186,14 @@ class Controllers(Movement):
         print("Начинаем",oven_mode, "в", oven_unit, time.time())
         if oven_mode == "pre_heating":
             time_changes_requset.set_result({oven_unit: (time.time() + 10)})
+            print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
             await asyncio.sleep(10)
         else:
             time_changes_requset.set_result({oven_unit: (time.time() + 60)})
+            print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
             await asyncio.sleep(60)
-        result = True
         print("контроллеры закончили", oven_mode, time.time())
-        return result
+        operations_result_futura.set_result(True)
 
     @classmethod
     async def give_paper(cls):

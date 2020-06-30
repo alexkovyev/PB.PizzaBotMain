@@ -86,20 +86,17 @@ class Recipy(ConfigMixin):
         place_to, limit = move_params
         duration = await self.get_move_chain_duration(place_to)
         is_need_to_dance = False
-        print("*********Есть ли лимит времени", self.time_limit)
         try:
             if limit and self.time_limit:
                 place_now = await RA.get_current_position()
                 # получаем все возможные временные варианты доезда до точки
                 delivery_time_options = await RA.get_position_move_time(place_now, place_to)
                 time_left = self.time_limit - time.time()
-                print("Разница лимита и чейна",time_left)
                 time_options = list(filter(lambda t: t <= time_left, delivery_time_options))
                 if time_options:
                     duration = max(time_options)
                 is_need_to_dance = True if time_left > duration else False
                 dance_time = time_left - duration
-                print("Время танца", dance_time)
             await RA.position_move(place_to, duration)
             if is_need_to_dance:
                 print("начинаем танцевать дополнительно", dance_time, time.time())
@@ -146,9 +143,12 @@ class Recipy(ConfigMixin):
         Обработка футур пока не реализована
         """
         time_changes = asyncio.get_running_loop().create_future()
+        operation_result = asyncio.get_running_loop().create_future()
+        asyncio.create_task(Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes,
+                                                      operation_result))
+        await asyncio.sleep(0.5)
         await self.time_changes_handler(time_changes)
-        operation_results = await Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes)
-        return operation_results
+        return operation_result
 
     async def controllers_cut_half_staff(self, cutting_program):
         print("Начинаем этап ПОРЕЖЬ продукт", time.time())
@@ -346,7 +346,6 @@ class Recipy(ConfigMixin):
         """Чейн по доставке и нарезки 1 п\ф"""
         print("% % % Начинаем чейн НАЧИНКИ", time.time())
         (filling_item, cutting_program, storage_adress) = args[0]
-        print(filling_item.upper())
         chain_list = [(self.change_gripper, "product"),
                       (self.bring_half_staff, storage_adress),
                       (self.put_half_staff_in_cut_station, None),
@@ -355,7 +354,6 @@ class Recipy(ConfigMixin):
         if self.status != "failed_to_be_cooked":
             self.time_limit = time.time() + cutting_program["duration"]
             self.is_cut_station_free.clear()
-            print("% % % УСТАНОВЛЕН лимит времени, начинаем нарезку в", time.time(), "сам лимит", self.time_limit)
             asyncio.create_task(self.controllers_cut_half_staff(cutting_program))
         print("СТАТУС блюда после начинки",self.status)
 
@@ -404,12 +402,13 @@ class Recipy(ConfigMixin):
         recipe = self.baking_program
         self.status = "baking"
         operation_result = await self.controllers_oven(oven_mode, recipe)
-        if operation_result:
+        while operation_result.done():
             self.is_dish_ready.set()
             print("БЛЮДО ГОТОВО")
             self.status = "ready"
             print("Это результат установки", self.is_dish_ready.is_set())
             await self.set_oven_timer()
+        await asyncio.sleep(0)
 
     async def set_oven_timer(self, *args):
         print("!!!!!!!!!!ставим таймер на печь", time.time())
@@ -437,13 +436,15 @@ class Recipy(ConfigMixin):
                 await args[1].high_priority_queue.put_nowait()
                 self.status = self.STOP_STATUS
 
-    async def time_changes_handler(self, time_futura, is_limit_factor = None,  *args):
+    async def time_changes_handler(self, time_futura,  *args):
         """Обрабатывает результаты футуры об изменении времени выпечки"""
-        print(time_futura, time.time())
-
-        if is_limit_factor:
-            time_limit = time.time() - int(time_futura[self.id])
-            await self.find_what_to_do(time_limit)
+        pass
+        # print("ОБРАБАТЫВАЕМ ФУТУРУ")
+        # lock = asyncio.Lock()
+        # async with lock:
+        #     self.time_changes_event["result"] = time_futura
+        #     self.time_changes_event["event"].set()
+        # print(self.time_changes_event)
 
     def create_dish_recipe(self):
         """создает рецепт блюда"""
@@ -459,8 +460,7 @@ class Recipy(ConfigMixin):
         oven_mode = "make_crust"
         recipe = self.make_crust_program
         time_changes = asyncio.get_running_loop().create_future()
-        is_limit_factor = True
-        await self.time_changes_handler((time_changes, is_limit_factor))
+        await self.time_changes_handler(time_changes)
         operation_results = await Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes)
         return operation_results
 

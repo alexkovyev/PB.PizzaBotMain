@@ -28,7 +28,7 @@ class BeforeCooking(BaseMode):
         # не сделано, заглушка
         is_equipment_ok = True
         print("Начинаем тестировать оборудования", time.time())
-        time.sleep(10)
+        time.sleep(4)
         print("Оборудование протестировано, исправно", time.time())
         return is_equipment_ok, equipment_data
 
@@ -38,7 +38,7 @@ class BeforeCooking(BaseMode):
         не сделано, заглушка
         """
         print("Начинаем парсить рецепты", time.time())
-        time.sleep(10)
+        time.sleep(4)
         print("Рецепты спарсены", time.time())
         recipes = recipe_data
         return recipes
@@ -83,6 +83,7 @@ class CookingMode(BaseMode):
         self.equipment = equipment
         self.current_orders_proceed = {}
         self.orders_requested_for_delivery = {}
+        self.oven_time_changes_event = {"event": asyncio.Event(), "result": None}
         # разные полезные очереди по приоритету
         self.main_queue = asyncio.Queue()
         self.high_priority_queue = asyncio.Queue()
@@ -91,11 +92,14 @@ class CookingMode(BaseMode):
     @property
     def is_downtime(self):
         """Проверяет можно ли танцеать, те все очереди пустые"""
-        if not all(
-                map(lambda p: p.empty(), (self.main_queue, self.low_priority_queue, self.high_priority_queue))):
-            return False
-        else:
-            return True
+        return all(map(lambda p: p.empty(),
+                       (self.main_queue, self.low_priority_queue, self.high_priority_queue)))
+
+        # if not all(
+        #         map(lambda p: p.empty(), (self.main_queue, self.low_priority_queue, self.high_priority_queue))):
+        #     return False
+        # else:
+        #     return True
 
     async def checking_order_for_double(self, new_order_id):
         """Этот метод проверяет есть ли уже заказ с таким ref id в обработке
@@ -247,16 +251,14 @@ class CookingMode(BaseMode):
 
         order_content = await self.get_order_content_from_db(new_order)
         await self.get_recipe_data(order_content["dishes"])
-        # резервируем печи для заказа (сразу 2 шт)
         try:
             ovens_reserved = await self.reserve_oven(order_content)
         except OvenReserveFailed:
             pass
-        order = BaseOrder(order_content, ovens_reserved)
+        order = BaseOrder(order_content, ovens_reserved, self.oven_time_changes_event)
         if order:
             # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
             self.current_orders_proceed[order.ref_id] = order
-            print(self.current_orders_proceed)
             for dish in order.dishes:
                 await dish.half_staff_cell_evaluation()
                 await self.put_chains_in_queue(dish, self.main_queue)
@@ -280,8 +282,10 @@ class CookingMode(BaseMode):
             print("Готовим блюдо", chain_to_do.__self__.id)
             await chain_to_do(params, self)
 
-    async def cooking(self):
-        """Эта курутина обеспечивает вызов методов по приготовлению блюд и другой важной работе"""
+    async def run(self):
+        """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""
+
+        asyncio.create_task(self.time_changes_monitor())
 
         while True:
             print("Работает cooking", time.time())
@@ -297,6 +301,20 @@ class CookingMode(BaseMode):
                     await self.unpack_chain_data(self.main_queue)
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
+
+    async def time_changes_monitor(self):
+        """Отслеживает наступление события изменения времени выпечки
+        ошибка после срабатывания пустой словарь
+        """
+        pass
+        # while True:
+        #     print("Это евент", type(self.oven_time_changes_event))
+        #     print("Это евент", (self.oven_time_changes_event))
+        #     await self.oven_time_changes_event["event"].wait()
+        #     print("**:*:?*?*?*?*?%? СРАБОТАЛ event")
+        #     print("Результат", self.oven_time_changes_event["result"])
+        #     # добавить обработку времен
+        #     self.oven_time_changes_event.clear()
 
     async def broken_equipment_handler(self, event_params, equipment):
         """Этот метод обрабатывает поломки оборудования, поступающий на event_listener
@@ -404,7 +422,7 @@ class CookingMode(BaseMode):
             "cooking": 2,
             "ready": 3,
             "informed": 3,
-            "failed_to_be_cooked":3
+            "failed_to_be_cooked": 3
         }
         if order_check_code in self.current_orders_proceed:
             order_status = self.current_orders_proceed[order_check_code].status

@@ -87,7 +87,6 @@ class PizzaBotMain(object):
         """Этот метод обрабатывает запросы приема новых заказов в зависимости от текущего режима киоска,
         запускает создание нового заказа при необходимости.
         """
-        print("Получили запрос от SS на новый заказ", time.time())
         if not request.body_exists:
             raise web.HTTPNoContent
         request_body = await request.json()
@@ -236,7 +235,7 @@ class PizzaBotMain(object):
         self.current_state = COOKINGMODE
         if future is not None and not future.cancelled():
             future.set_result(SUCCEED_FUTURA_RESULT)
-        await self.current_instance.cooking()
+        await self.current_instance.run()
 
     async def testing_start(self, future, *args):
         """ Это супер метод тестов"""
@@ -349,7 +348,7 @@ class PizzaBotMain(object):
     async def get_equipment_data(self):
         """Это метод - заглушка, который имитрует подключение к БД и получение данных
         об оборудовании"""
-        await asyncio.sleep(10)
+        await asyncio.sleep(2)
         oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
         equipment_data = {
             "ovens": {i: {"oven_id": i, "status": "free"} for i in oven_ids},
@@ -418,11 +417,14 @@ class PizzaBotMain(object):
         controllers_bus = asyncio.create_task(event_generator(self.events_monitoring, self.equipment))
         event_listener = asyncio.create_task(self.create_hardware_broke_listener())
         is_able_to_cook_monitor = asyncio.create_task(self.is_able_to_cook_monitoring())
-        discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
+        # discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
         message_monitoring = asyncio.create_task(self.message_sending_worker())
 
         await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor,
-                             discord_sender, message_monitoring, on_start_tasks)
+                            message_monitoring, on_start_tasks)
+
+        # await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor,
+        #                      discord_sender, message_monitoring, on_start_tasks)
 
     def start_server(self):
         """Это основай метод запуска работы приложения"""
