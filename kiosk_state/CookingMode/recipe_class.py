@@ -146,7 +146,9 @@ class Recipy(ConfigMixin):
         operation_result = asyncio.get_running_loop().create_future()
         asyncio.create_task(Controllers.start_baking(self.oven_unit.oven_id, oven_mode, recipe, time_changes,
                                                       operation_result))
-        await asyncio.sleep(0.5)
+        while not time_changes.done():
+            await asyncio.sleep(0.0001)
+        print("Футура доделала", time.time())
         await self.time_changes_handler(time_changes)
         return operation_result
 
@@ -208,9 +210,7 @@ class Recipy(ConfigMixin):
         if is_need_to_change_gripper:
             await self.move_to_object((self.CAPTURE_STATION, None))
             while current_gripper != required_gripper:
-                # эмуляция работы
-                print("ТРЕБУЕМЫЙ захват", required_gripper)
-                print("ТЕКУЩИЙ захват", current_gripper)
+                # эмуляция работы)
                 if current_gripper is not None:
                     await self.atomic_chain_execute({"place": "gripper_unit", "name": "set_gripper"})
                     await self.atomic_chain_execute({"place": "gripper_unit", "name": "get_gripper"})
@@ -438,13 +438,12 @@ class Recipy(ConfigMixin):
 
     async def time_changes_handler(self, time_futura,  *args):
         """Обрабатывает результаты футуры об изменении времени выпечки"""
-        pass
-        # print("ОБРАБАТЫВАЕМ ФУТУРУ")
-        # lock = asyncio.Lock()
-        # async with lock:
-        #     self.time_changes_event["result"] = time_futura
-        #     self.time_changes_event["event"].set()
-        # print(self.time_changes_event)
+        print("ОБРАБАТЫВАЕМ ФУТУРУ")
+        print(" Это ффутура из time_change_handler",self.time_changes_event)
+        lock = asyncio.Lock()
+        async with lock:
+            self.time_changes_event["result"] = time_futura
+            self.time_changes_event["event"].set()
 
     def create_dish_recipe(self):
         """создает рецепт блюда"""

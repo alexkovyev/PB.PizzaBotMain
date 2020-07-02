@@ -306,15 +306,24 @@ class CookingMode(BaseMode):
         """Отслеживает наступление события изменения времени выпечки
         ошибка после срабатывания пустой словарь
         """
-        pass
-        # while True:
-        #     print("Это евент", type(self.oven_time_changes_event))
-        #     print("Это евент", (self.oven_time_changes_event))
-        #     await self.oven_time_changes_event["event"].wait()
-        #     print("**:*:?*?*?*?*?%? СРАБОТАЛ event")
-        #     print("Результат", self.oven_time_changes_event["result"])
-        #     # добавить обработку времен
-        #     self.oven_time_changes_event.clear()
+        while True:
+            await self.oven_time_changes_event["event"].wait()
+            print("**:*:?*?*?*?*?%? СРАБОТАЛ event")
+            print("Результат", self.oven_time_changes_event["result"])
+            await self.stop_baking_time_setter()
+            lock = asyncio.Lock()
+            async with lock:
+                self.oven_time_changes_event["event"].clear()
+                self.oven_time_changes_event["result"] = None
+
+    async def stop_baking_time_setter(self):
+        print("Зашли в сеттер")
+        futura_result = await self.oven_time_changes_event["result"]
+        print(futura_result)
+        for oven in futura_result:
+            print(oven)
+            self.equipment.ovens.oven_units[oven].stop_baking_time = futura_result[oven]
+            print("Это результат сетера", self.equipment.ovens.oven_units[oven].stop_baking_time)
 
     async def broken_equipment_handler(self, event_params, equipment):
         """Этот метод обрабатывает поломки оборудования, поступающий на event_listener

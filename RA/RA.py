@@ -18,10 +18,10 @@ class Movement(object):
 
     @staticmethod
     async def movement(n):
-        print("__ RA начал работу")
+        # print("__ RA начал работу")
         await asyncio.sleep(n)
         result = random.choice([True, True])
-        print("__ Работа RA завершена")
+        # print("__ Работа RA завершена")
         return result
 
 
