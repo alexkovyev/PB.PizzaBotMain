@@ -185,7 +185,7 @@ class Controllers(Movement):
          """
         print("Начинаем",oven_mode, "в", oven_unit, time.time())
         if oven_mode == "pre_heating":
-            time_changes_requset.set_result({oven_unit: (time.time() + 10)})
+            time_changes_requset.set_result({oven_unit: (time.time() + 20)})
             print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
             await asyncio.sleep(10)
         else:

@@ -42,14 +42,29 @@ class PizzaBotMain(object):
     """
 
     def __init__(self):
-        self.current_state = STANDBYMODE
+        self.current_instance = StandByMode.StandBy()
         self.equipment = None
         self.events_monitoring = ControllersEvents()
         self.command_status = {}
-        self.is_able_to_cook = True
-        self.current_instance = StandByMode.StandBy()
         self.discord_bot_client = DiscordBotAccess()
         self.messages_for_sending = asyncio.Queue()
+        self.is_able_to_cook = True
+
+    @property
+    def current_state(self):
+        stand_by_mode = STANDBYMODE
+        cooking_mode = COOKINGMODE
+        testing_mode = TESTINGMODE
+        before_cooking = BEFORECOOKING
+
+        if isinstance(self.current_instance, CookingMode.CookingMode):
+            return cooking_mode
+        elif isinstance(self.current_instance, StandByMode.StandBy):
+            return stand_by_mode
+        elif isinstance(self.current_instance, TestingMode.TestingMode):
+            return testing_mode
+        elif isinstance(self.current_instance, CookingMode.BeforeCooking):
+            return before_cooking
 
     def create_server(self):
         """Этот метод создает приложение aiohttp сервера, а также привязывает routes api
@@ -225,21 +240,19 @@ class PizzaBotMain(object):
         :param future: объект футуры, создаваемый при запуске режиме через АПИ
         """
         print("ЗАПУСКАЕМ режим ГОТОВКИ")
-        self.current_state = BEFORECOOKING
+        # self.current_state = BEFORECOOKING
         self.current_instance = CookingMode.BeforeCooking()
         if self.equipment is None:
             print("ОШИБКА ОБОРУДОВАНИЯ")
             self.equipment = await self.add_equipment_data()
         (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
         self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
-        self.current_state = COOKINGMODE
         if future is not None and not future.cancelled():
             future.set_result(SUCCEED_FUTURA_RESULT)
         await self.current_instance.run()
 
     async def testing_start(self, future, *args):
         """ Это супер метод тестов"""
-        self.current_state = TESTINGMODE
         self.current_instance = TestingMode.TestingMode()
 
         if args[0]["testing_type"] == FULL_TESTING_CODE:
@@ -253,7 +266,7 @@ class PizzaBotMain(object):
             await asyncio.sleep(20)
             print("Тестирование узла завершено")
 
-        self.current_state = STANDBYMODE
+        # self.current_state = STANDBYMODE
         self.current_instance = StandByMode.StandBy()
         if future is not None and not future.cancelled():
             future.set_result(SUCCEED_FUTURA_RESULT)

@@ -21,9 +21,15 @@ class BaseOrder(object):
     def dish_creation(self, dishes, ovens_reserved, time_changes_event):
         """Creates list of dishes objects in order"""
 
-        self.dishes = [BaseDish(dish_id, dishes[dish_id], ovens_reserved[index], time_changes_event)
+        self.dishes = [BaseDish(dish_id, dishes[dish_id], ovens_reserved[index], time_changes_event, self.ref_id)
                        for index, dish_id in enumerate(dishes)]
         return self.dishes
+
+    async def dish_marker(self):
+        if len(self.dishes) > 1:
+            self.dishes[-1].one_dish_order = True
+        else:
+            self.dishes[0].one_dish_order = True
 
     async def create_is_order_ready_monitoring(self):
         """Этот метод создает мониторинг готовности блюд заказа через asyncio.Event """
@@ -61,9 +67,11 @@ class BaseDish(Recipy):
                      "packed", "time_is_up"]
     STOP_STATUS = "failed_to_be_cooked"
 
-    def __init__(self, dish_id, dish_data, free_oven_id, time_changes_event):
+    def __init__(self, dish_id, dish_data, free_oven_id, time_changes_event, order_ref_id):
         super().__init__()
         self.id = dish_id
+        self.order_ref_id = order_ref_id
+        self.one_dish_order = False
         # распаковываем данные о том, из чего состоит блюдо
         self.dough = BaseDough(dish_data["dough"])
         self.sauce = BaseSauce(dish_data["sauce"])

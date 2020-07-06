@@ -378,7 +378,7 @@ class Recipy(ConfigMixin):
             print("Танцеуем")
             await RA.dance()
 
-        asyncio.create_task(self.controllers_turn_heating_on())
+        # asyncio.create_task(self.controllers_turn_heating_on())
         await self.chain_execute(chain_list)
         print("Оставили лопатку в печи", time.time())
         if self.status != "failed_to_be_cooked":

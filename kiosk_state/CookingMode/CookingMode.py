@@ -7,6 +7,7 @@ from functools import partial
 
 from .BaseOrder import BaseOrder
 from .CookingModeErrors import OvenReserveFailed
+from config.config import COOKINGMODE
 from config.recipe_data import recipe_data
 from controllers.ControllerBus import Controllers
 from kiosk_state.BaseMode import BaseMode
@@ -49,14 +50,17 @@ class BeforeCooking(BaseMode):
         используется run_in_executor"""
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
         my_loop = asyncio.get_running_loop()
+
         async def task_1(equipment_data):
             is_equipment_ok, equipment_data = await my_loop.run_in_executor(pool,
                                                                             partial(clx.start_testing,
                                                                                     equipment_data))
             return is_equipment_ok, equipment_data
+
         async def task_2():
             recipes = await my_loop.run_in_executor(pool, clx.parse_recipes)
             return recipes
+
         task_1 = my_loop.create_task(task_1(equipment_data))
         task_2 = my_loop.create_task(task_2())
         my_result = await asyncio.gather(task_1, task_2)
@@ -95,18 +99,11 @@ class CookingMode(BaseMode):
         return all(map(lambda p: p.empty(),
                        (self.main_queue, self.low_priority_queue, self.high_priority_queue)))
 
-        # if not all(
-        #         map(lambda p: p.empty(), (self.main_queue, self.low_priority_queue, self.high_priority_queue))):
-        #     return False
-        # else:
-        #     return True
-
     async def checking_order_for_double(self, new_order_id):
         """Этот метод проверяет есть ли уже заказ с таким ref id в обработке
-        :param new_order_id: int
+        :param new_order_id: str
         :return bool"""
-        is_new_order = True if new_order_id not in self.current_orders_proceed.keys() else False
-        return is_new_order
+        return True if new_order_id not in self.current_orders_proceed else False
 
     async def get_order_content_from_db(self, new_order_id):
         """Этот метод вызывает процедуру 'Получи состав блюд в заказе' и возвращает словарь вида
@@ -219,7 +216,8 @@ class CookingMode(BaseMode):
             dough_id = dish["dough"]["id"]
             dish["filling"]["cooking_program"] = self.recipes["filling"][filling_id]["cooking_program"][dough_id]
             dish["filling"]["make_crust_program"] = self.recipes["filling"][filling_id]["make_crust_program"][dough_id]
-            dish["filling"]["pre_heating_program"] = self.recipes["filling"][filling_id]["pre_heating_program"][dough_id]
+            dish["filling"]["pre_heating_program"] = self.recipes["filling"][filling_id]["pre_heating_program"][
+                dough_id]
             dish["filling"]["stand_by"] = self.recipes["filling"][filling_id]["stand_by_program"][dough_id]
             halfstaff_content = dish["filling"]["content"]
             cutting_program = self.recipes["filling"][filling_id]["cutting_program"]
@@ -258,6 +256,7 @@ class CookingMode(BaseMode):
         order = BaseOrder(order_content, ovens_reserved, self.oven_time_changes_event)
         if order:
             # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
+            await order.dish_marker()
             self.current_orders_proceed[order.ref_id] = order
             for dish in order.dishes:
                 await dish.half_staff_cell_evaluation()
@@ -286,6 +285,7 @@ class CookingMode(BaseMode):
         """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""
 
         asyncio.create_task(self.time_changes_monitor())
+        asyncio.create_task(self.dish_inform_monitor())
 
         while True:
             print("Работает cooking", time.time())
@@ -302,9 +302,29 @@ class CookingMode(BaseMode):
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
 
+    async def dish_inform_monitor(self):
+        while True:
+            time_list = []
+            for oven in self.equipment.ovens.oven_units.values():
+                if oven.stop_baking_time is not None and oven.stop_baking_time > (time.time() +10) and \
+                        oven.stop_baking_time < (time.time() +11):
+                    print("Это время окончания выпечки в печи", oven.stop_baking_time)
+                    print(time.time())
+                    print("Это блюдо", oven.dish)
+                    time_list.append(oven.dish)
+                    print("записали в список", time_list)
+            print("Это временной список для готовности блюда", time_list)
+            if time_list:
+                for dish in time_list:
+                    print("Записываем статус блюда на почти готово", dish)
+                    dish_object = await self.get_dish_object(dish)
+                    print("Это номер заказа", dish_object.one_dish_order)
+                    if dish_object.one_dish_order:
+                        print("заказ почти готов", dish.order_ref_id)
+            await asyncio.sleep(1)
+
     async def time_changes_monitor(self):
-        """Отслеживает наступление события изменения времени выпечки
-        ошибка после срабатывания пустой словарь
+        """Отслеживает наступление события изменения времени выпечки для информирования о готовности блюд
         """
         while True:
             await self.oven_time_changes_event["event"].wait()
@@ -317,7 +337,6 @@ class CookingMode(BaseMode):
                 self.oven_time_changes_event["result"] = None
 
     async def stop_baking_time_setter(self):
-        print("Зашли в сеттер")
         futura_result = await self.oven_time_changes_event["result"]
         print(futura_result)
         for oven in futura_result:
@@ -390,7 +409,7 @@ class CookingMode(BaseMode):
                 if dish_status == "cooking":
                     print("Запутить смену лопаток в высокий приоритет")
                     await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, (new_oven_object.oven_id,
-                                                                                  broken_oven_id)))
+                                                                                      broken_oven_id)))
                     ovens_list[broken_oven_id].dish = None
                 elif dish_status == "baking":
                     print("Запустить ликвидацю блюда")
@@ -441,12 +460,15 @@ class CookingMode(BaseMode):
                 print("статус блюда не распознан")
                 set_mode = "not_found"
         else:
-            set_mode = "not_found"
+            set_mode = "not_foun*d"
         return set_mode
 
     async def delivery_request_handler(self, order_check_code):
         """Запускает процедуру выдачи заказа
         ДОБАВИТЬ ОЧИСТКУ поля ПЕЧЬ после упаковке --> oven_unit = None"""
         for dish in self.current_orders_proceed[order_check_code].dishes:
-            print("Вот это блюдо выдаем",dish)
+            print("Вот это блюдо выдаем", dish)
             # не сделано
+
+    def __repr__(self):
+        return f"{COOKINGMODE}"
