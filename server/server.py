@@ -8,7 +8,7 @@ import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config.config import (ServerConfig,
+from data.server_confg.server_confg import (ServerConfig,
                            ServerMessages,
                            KioskModeNames)
 from controllers.ControllerBus import ControllersEvents, event_generator

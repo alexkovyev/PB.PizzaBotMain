@@ -32,22 +32,3 @@ class CookingModeConst(object):
     OVEN_LIQUIDATION_TIME = 60
     OVEN_FREE_WAITING_TIME = 35
     HALF_STAFF_CHECK_TIME = 60
-
-
-class DiscordConfg(object):
-    DISCORD_ADMIN_CHANNEL_NAME = "admin"
-    DISCORD_OPERATOR_CHANNEL_NAME = "operator"
-    DISCORD_TEMPLATES = {
-        'end_of_shelf_life': {
-            'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта "
-                    "{halfstaff_name} при мин остатке {min_qt}.",
-            'receivers': ('operator', 'admin')
-        },
-        'out_of_stock': {
-            'text': "На объекте PIzzaBot {id} по адресу {address} осталось {N} порций продукта {"
-                    "halfstaff_name} при мин остатке {min_qt}.",
-            'receivers': ('operator', 'admin')
-        }
-    }
-    with open("config/bot_token.txt") as bot_token:
-        DISCORD_TOKEN = bot_token.read().strip()
