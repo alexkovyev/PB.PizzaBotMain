@@ -8,7 +8,7 @@ from RA.RA import RA
 from RA.RA import RAError
 from controllers.ControllerBus import Controllers
 
-from config.config import OVEN_LIQUIDATION_TIME, OVEN_FREE_WAITING_TIME
+from config.config import CookingModeConst
 
 
 class ConfigMixin(object):
@@ -35,7 +35,8 @@ class Recipy(ConfigMixin):
         self.time_limit = None
 
     # методы в части RA
-    async def get_move_chain_duration(self, place_to):
+    @staticmethod
+    async def get_move_chain_duration(place_to):
         """ Метод получает варианты длительности передвижения, выбирает тот, который
         удовлетвоаряет условиям
         :param place_to: str
@@ -60,17 +61,16 @@ class Recipy(ConfigMixin):
             raise RAError
         return duration
 
-    async def atomic_chain_execute(self, atomic_params_dict):
+    @classmethod
+    async def atomic_chain_execute(clx, atomic_params_dict):
         """Этот метод выполняет группу атомарных действий
         :param atomic_params_dict: dict с параметрами (name, place)"""
-        duration = await self.get_atomic_chain_duration(atomic_params_dict)
-        if self.status != self.STOP_STATUS:
-            try:
-                await RA.atomic_action(**atomic_params_dict)
-                print("Успешно выполнили атомарное действие", atomic_params_dict["name"])
-            except RAError:
-                self.status = self.STOP_STATUS
-                print("Ошибка атомарного действия")
+        duration = await clx.get_atomic_chain_duration(atomic_params_dict)
+        try:
+            await RA.atomic_action(**atomic_params_dict)
+            print("Успешно выполнили атомарное действие", atomic_params_dict["name"])
+        except RAError:
+            print("Ошибка атомарного действия")
 
     async def move_to_object(self, move_params):
         """Эта функция описывает движение до определенного места.
@@ -104,7 +104,8 @@ class Recipy(ConfigMixin):
                 if result:
                     print("RBA успешно подъехал к", place_to, time.time())
         except RAError:
-            self.status = self.STOP_STATUS
+            # self.status = self.STOP_STATUS
+            print("Ошибка RA")
 
     # controllers
     async def controllers_get_dough(self, *args):
@@ -116,7 +117,7 @@ class Recipy(ConfigMixin):
             print("взяли тесто у контроллеров")
         else:
             print("Ошибка получения теста у контроллеров")
-            self.status = self.STOP_STATUS
+            await self.mark_dish_as_failed()
         # запускает метод списать п\ф
         print("СТАТУС блюда после получения теста", self.status)
 
@@ -130,8 +131,7 @@ class Recipy(ConfigMixin):
             print("успешно полили соусом")
             self.is_cut_station_free.set()
         else:
-            print("---!!! Не успешно полили соусом")
-            self.status = self.STOP_STATUS
+            await self.mark_dish_as_failed()
         print("СТАТУС блюда после поливки соусом", self.status)
 
     async def controllers_oven(self, oven_mode, recipe):
@@ -165,7 +165,7 @@ class Recipy(ConfigMixin):
             print("СНЯТ временой ЛИМИТ в", time.time())
         else:
             print("---!!! Не успешно нарезали п\ф")
-            self.status = self.STOP_STATUS
+            await self.mark_dish_as_failed()
         print("СТАТУС блюда в нарезке", self.status)
 
     async def controllers_give_paper(self):
@@ -175,6 +175,8 @@ class Recipy(ConfigMixin):
             pass
         else:
             print("Неудача с бумагой")
+            await self.mark_dish_as_failed()
+
             # расписать какая ошибка: - замятие бумаги или полная поломка
             # если замятие, добавить вызов RA на уборку бумаги
 
@@ -191,8 +193,8 @@ class Recipy(ConfigMixin):
                 else:
                     break
         except RAError:
-            self.status = self.STOP_STATUS
             print("Ошибка века")
+            await self.mark_dish_as_failed()
 
     @staticmethod
     async def is_need_to_change_gripper(current_gripper: str, required_gripper: str):
@@ -326,7 +328,7 @@ class Recipy(ConfigMixin):
         """Метод рецепта, описываюший этап возьи тесто и полей соусом"""
         print("Начинается chain Возьми ТЕСТО", time.time())
         self.status = "cooking"
-        chain_list = [(self.change_gripper, "None"),
+        to_do_list = [(self.change_gripper, "None"),
                       (self.move_to_object, (self.oven_unit, None)),
                       (self.get_vane_from_oven, None),
                       (self.move_to_object, (self.SLICING, None)),
@@ -335,7 +337,7 @@ class Recipy(ConfigMixin):
                       (self.move_to_object, (self.SLICING, None)),
                       (self.leave_vane_in_cut_station, None),
                       ]
-        await self.chain_execute(chain_list)
+        await self.chain_execute(to_do_list)
         print("Закончили с ТЕСТОМ",time.time(), self.status)
         if self.status != "failed_to_be_cooked":
             asyncio.create_task(self.controllers_give_sauce())
@@ -414,7 +416,7 @@ class Recipy(ConfigMixin):
         print("!!!!!!!!!!ставим таймер на печь", time.time())
         oven_future = asyncio.get_running_loop().create_future()
         self.oven_future = oven_future
-        self.oven_unit.dish_waiting_time = time.time() + OVEN_FREE_WAITING_TIME
+        self.oven_unit.dish_waiting_time = time.time() + CookingModeConst.OVEN_FREE_WAITING_TIME
         await asyncio.create_task(self.oven_timer())
 
     async def oven_timer(self, *args):
@@ -422,13 +424,13 @@ class Recipy(ConfigMixin):
         print("!!!!!!!!!!!!Начинаем ждать первый интервал", time.time())
         print("Статус печи", self.oven_unit.status)
         self.oven_unit.status = "waiting_15"
-        await asyncio.sleep(OVEN_FREE_WAITING_TIME)
+        await asyncio.sleep(CookingModeConst.OVEN_FREE_WAITING_TIME)
         print("!!!!!!!!!!! время первого сна завершено",time.time())
         if not self.oven_future.cancelled():
             print("!!!!!!!!!!!!!!блюдо не забрали, запускаем 60 сек")
             self.oven_unit.status = "waiting_60"
-            self.oven_unit.dish_waiting_time = time.time() + OVEN_LIQUIDATION_TIME
-            await asyncio.sleep(OVEN_LIQUIDATION_TIME)
+            self.oven_unit.dish_waiting_time = time.time() + CookingModeConst.OVEN_LIQUIDATION_TIME
+            await asyncio.sleep(CookingModeConst.OVEN_LIQUIDATION_TIME)
             if not self.oven_future.cancelled():
                 print("!!!!!!!!!!!!!!блюдо не забрали, запускаем чистку")
                 self.oven_future.set_result("time is over")
@@ -512,5 +514,50 @@ class Recipy(ConfigMixin):
         await self.chain_execute(chain_list)
         # что будет если неудачно?
 
+    async def mark_dish_as_failed(self):
+        self.status = self.STOP_STATUS
+        self.is_dish_ready.set()
+
 # да, тут пока вообще помойка, нужен мощный рефакторинг
 # не сделано
+
+
+class RAToolsMixin(object):
+
+    @staticmethod
+    async def get_move_chain_duration(place_to):
+        """ Метод получает варианты длительности передвижения, выбирает тот, который
+        удовлетвоаряет условиям
+        :param place_to: str
+        :return: int
+        """
+        current_destination = await RA.get_current_position()
+        forward_destination = place_to
+        possible_duration = await RA.get_position_move_time(current_destination, forward_destination)
+        if possible_duration:
+            return min(possible_duration)
+        else:
+            raise RAError
+
+    @staticmethod
+    async def get_atomic_chain_duration(atomic_info):
+        """ Этот метод получает длительность группы атомарных действий в сек
+        :param atomic_info:
+        :return:
+        """
+        duration = await RA.get_atomic_action_time(**atomic_info)
+        if not duration:
+            raise RAError
+        return duration
+
+    @classmethod
+    async def atomic_chain_execute(clx, atomic_params_dict):
+        """Этот метод выполняет группу атомарных действий
+        :param atomic_params_dict: dict с параметрами (name, place)"""
+        duration = await clx.get_atomic_chain_duration(atomic_params_dict)
+        try:
+            await RA.atomic_action(**atomic_params_dict)
+            print("Успешно выполнили атомарное действие", atomic_params_dict["name"])
+        except RAError:
+            print("Ошибка атомарного действия")
+

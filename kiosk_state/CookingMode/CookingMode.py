@@ -7,8 +7,8 @@ from functools import partial
 
 from .BaseOrder import BaseOrder
 from .CookingModeErrors import OvenReserveFailed
-from config.config import COOKINGMODE
-from config.recipe_data import recipe_data
+from config.config import KioskModeNames
+from redis.recipe_data import recipe_data
 from controllers.ControllerBus import Controllers
 from kiosk_state.BaseMode import BaseMode
 from RA.RA import RA
@@ -92,6 +92,7 @@ class CookingMode(BaseMode):
         self.main_queue = asyncio.Queue()
         self.high_priority_queue = asyncio.Queue()
         self.low_priority_queue = asyncio.Queue()
+        self.is_limit_active = asyncio.Event()
 
     @property
     def is_downtime(self):
@@ -320,7 +321,7 @@ class CookingMode(BaseMode):
                     dish_object = await self.get_dish_object(dish)
                     print("Это номер заказа", dish_object.one_dish_order)
                     if dish_object.one_dish_order:
-                        print("заказ почти готов", dish.order_ref_id)
+                        print("заказ почти готов", dish_object.order_ref_id)
             await asyncio.sleep(1)
 
     async def time_changes_monitor(self):
@@ -471,4 +472,4 @@ class CookingMode(BaseMode):
             # не сделано
 
     def __repr__(self):
-        return f"{COOKINGMODE}"
+        return f"{KioskModeNames.COOKINGMODE}"

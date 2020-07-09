@@ -3,14 +3,11 @@
 
 import discord
 
-from config.config import (DISCORD_TOKEN,
-                           DISCORD_TEMPLATES,
-                           DISCORD_ADMIN_CHANNEL_NAME,
-                           DISCORD_OPERATOR_CHANNEL_NAME)
+from config.config import DiscordConfg
 
 
-operator_channel_name = DISCORD_OPERATOR_CHANNEL_NAME
-admin_channel_name = DISCORD_ADMIN_CHANNEL_NAME
+operator_channel_name = DiscordConfg.DISCORD_OPERATOR_CHANNEL_NAME
+admin_channel_name = DiscordConfg.DISCORD_ADMIN_CHANNEL_NAME
 
 
 class DiscordBotAccess(discord.Client):
@@ -18,12 +15,12 @@ class DiscordBotAccess(discord.Client):
 
     def __init__(self):
         super().__init__()
-        self.token = DISCORD_TOKEN
+        self.token = DiscordConfg.DISCORD_TOKEN
         self.receivers = {
             operator_channel_name: {},
             admin_channel_name: {}
         }
-        self.message_templates = DISCORD_TEMPLATES
+        self.message_templates = DiscordConfg.DISCORD_TEMPLATES
 
     async def on_ready(self):
         """Этот метод подгружает данные каналов для отправки динамчески"""

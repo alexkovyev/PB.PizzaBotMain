@@ -44,7 +44,15 @@ class BaseOrder(object):
         while not all(list(map(lambda i: i.is_set(), self.is_order_ready_monitoring))):
             await asyncio.sleep(1)
         print("Сработало событие ЗАКАЗ ГОТОВ", time.time())
-        self.status = "ready"
+        print(list(map((lambda i: i.status == "failed_to_be_cooked"), self.dishes)))
+
+        if all(list(map((lambda i: i.status == "failed_to_be_cooked"), self.dishes))):
+            self.status = "failed_to_be_cooked"
+        elif any(list(map((lambda i: i.status == "failed_to_be_cooked"), self.dishes))):
+            self.status = "partially_ready"
+        else:
+            self.status = "ready"
+        print("Это статус ЗАКАЗА",self.status)
         # записать в БД статус
 
     def __repr__(self):
