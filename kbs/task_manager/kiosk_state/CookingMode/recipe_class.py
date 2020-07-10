@@ -8,7 +8,7 @@ from kbs.ra_api.RA import RA
 from kbs.ra_api.RA import RAError
 from kbs.cntrls_api.ControllerBus import Controllers
 
-from kbs.data.server_confg.server_confg import CookingModeConst
+from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 
 
 class ConfigMixin(object):
