@@ -6,14 +6,14 @@ import time
 from functools import partial
 
 from .BaseOrder import BaseOrder
-from .CookingModeErrors import OvenReserveFailed
-from config.config import KioskModeNames
-from redis.recipe_data import recipe_data
-from controllers.ControllerBus import Controllers
-from kiosk_state.BaseMode import BaseMode
-from RA.RA import RA
+from kbs.exceptions import OvenReserveFailed
+from kbs.data.server_confg.server_confg import KioskModeNames
+from kbs.redis.recipe_data import recipe_data
+from kbs.cntrls_api.ControllerBus import Controllers
+from kbs.task_manager.kiosk_state.BaseMode import BaseMode
+from kbs.ra_api.RA import RA
 from .recipe_class import Recipy
-from server.custom_errors import OvenReservationError
+from kbs.exceptions import OvenReservationError
 
 
 class BeforeCooking(BaseMode):

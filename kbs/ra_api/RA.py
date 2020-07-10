@@ -8,20 +8,20 @@ import time
 
 
 class RAError(Exception):
-    """Класс ошибок RA"""
+    """Класс ошибок ra_api"""
     pass
 
 
-# это просто эмуляция работы RA, необходимая для тестирования PBM
+# это просто эмуляция работы ra_api, необходимая для тестирования PBM
 class Movement(object):
-    """Эмуляция работы RA для нужд PBM"""
+    """Эмуляция работы ra_api для нужд PBM"""
 
     @staticmethod
     async def movement(n):
-        # print("__ RA начал работу")
+        # print("__ ra_api начал работу")
         await asyncio.sleep(n)
         result = random.choice([True, True])
-        # print("__ Работа RA завершена")
+        # print("__ Работа ra_api завершена")
         return result
 
 
@@ -49,9 +49,9 @@ class RA(Movement):
                  raiseError if not
                  # нужно определить типы ошибок
         """
-        print(f"RA двигается к {place} за {duration} сек", time.time())
+        print(f"ra_api двигается к {place} за {duration} сек", time.time())
         result = await cls.movement(duration)
-        print("RA доехал", time.time())
+        print("ra_api доехал", time.time())
         if result:
             return duration
         else:
@@ -72,7 +72,7 @@ class RA(Movement):
     async def atomic_action(cls, **kwargs):
         place = kwargs["place"]
         atomic_name = kwargs["name"]
-        print("RA выполняет атомарное действие", atomic_name)
+        print("ra_api выполняет атомарное действие", atomic_name)
         duration = random.randint(1, 10)
         result = await cls.movement(duration)
         return result
@@ -90,7 +90,7 @@ class RA(Movement):
 
     @classmethod
     async def get_current_position(cls):
-        """Возвращает текущее местоположение RA"""
+        """Возвращает текущее местоположение ra_api"""
         return "oven 1"
 
     @classmethod

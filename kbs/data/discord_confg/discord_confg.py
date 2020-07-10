@@ -13,5 +13,5 @@ class DiscordConfg(object):
             'receivers': ('operator', 'admin')
         }
     }
-    with open("data/discord_confg/bot_token.txt") as bot_token:
+    with open("kbs/data/discord_confg/bot_token.txt") as bot_token:
         DISCORD_TOKEN = bot_token.read().strip()

@@ -1,2 +1,0 @@
-class OvenReserveFailed(Exception):
-    pass

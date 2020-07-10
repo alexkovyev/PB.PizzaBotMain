@@ -1,6 +1,6 @@
 """Этот модуль содержит информацию об оборудовании"""
 
-from server.custom_errors import NoFreeOvenError, OvenReservationError
+from kbs.exceptions import NoFreeOvenError, OvenReservationError
 
 
 class Equipment(object):
@@ -33,13 +33,13 @@ class Equipment(object):
 class Oven(object):
     def __init__(self, ovens_data):
         # self.oven_units = ovens_data
-        # {'e0714152-182a-4da0-9d06-5190ad44d919': <server.equipment.OvenUnit object at 0x03C74D60>}
+        # {'e0714152-182a-4da0-9d06-5190ad44d919': <api_server.equipment.OvenUnit object at 0x03C74D60>}
         self.oven_units = {i: OvenUnit(ovens_data[i]) for i in ovens_data}
 
     async def fetch_oven_list_by_status(self, oven_status):
         """Этот метод получает список печей с необходимым статусом
         :return list of instances OvenUnit class
-        [ < server.equipment.OvenUnit object at 0x03C74D60 >, < server.equipment.OvenUnit object at0x03C74928 >]
+        [ < api_server.equipment.OvenUnit object at 0x03C74D60 >, < api_server.equipment.OvenUnit object at0x03C74928 >]
         """
         free_oven_list = [oven for oven in self.oven_units.values() if oven.status == oven_status]
         return free_oven_list

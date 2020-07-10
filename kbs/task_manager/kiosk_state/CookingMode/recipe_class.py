@@ -4,11 +4,11 @@
 import asyncio
 import time
 
-from RA.RA import RA
-from RA.RA import RAError
-from controllers.ControllerBus import Controllers
+from kbs.ra_api.RA import RA
+from kbs.ra_api.RA import RAError
+from kbs.cntrls_api.ControllerBus import Controllers
 
-from config.config import CookingModeConst
+from kbs.data.server_confg.server_confg import CookingModeConst
 
 
 class ConfigMixin(object):
@@ -34,7 +34,7 @@ class Recipy(ConfigMixin):
         self.is_cut_station_free = asyncio.Event()
         self.time_limit = None
 
-    # методы в части RA
+    # методы в части ra_api
     @staticmethod
     async def get_move_chain_duration(place_to):
         """ Метод получает варианты длительности передвижения, выбирает тот, который
@@ -76,7 +76,7 @@ class Recipy(ConfigMixin):
         """Эта функция описывает движение до определенного места.
         :param: tuple (place: uuid, limit: bool)
         limit - это флаг для выбора времени на перемещения.
-        RA одно и тоже движение может выполнить за разное время: мин возможное и "с танцами"
+        ra_api одно и тоже движение может выполнить за разное время: мин возможное и "с танцами"
         сам временной лимит, то есть время, в которое нужно приехать
         в конечную точку содержится в self.time_limit
         Если лимит True, то движение туда запускается по мин времени, а обратно
@@ -105,9 +105,9 @@ class Recipy(ConfigMixin):
                     print("RBA успешно подъехал к", place_to, time.time())
         except RAError:
             # self.status = self.STOP_STATUS
-            print("Ошибка RA")
+            print("Ошибка ra_api")
 
-    # controllers
+    # cntrls_api
     async def controllers_get_dough(self, *args):
         """отдает команду контролеру получить тесто"""
         print("получаем тесто у контрллеров")
@@ -178,7 +178,7 @@ class Recipy(ConfigMixin):
             await self.mark_dish_as_failed()
 
             # расписать какая ошибка: - замятие бумаги или полная поломка
-            # если замятие, добавить вызов RA на уборку бумаги
+            # если замятие, добавить вызов ra_api на уборку бумаги
 
     # low-level PBM
     async def chain_execute(self, chain_list):
@@ -198,7 +198,7 @@ class Recipy(ConfigMixin):
 
     @staticmethod
     async def is_need_to_change_gripper(current_gripper: str, required_gripper: str):
-        """метод проверяет нужно ли менять захват RA
+        """метод проверяет нужно ли менять захват ra_api
         """
         if str(current_gripper) != required_gripper:
             return True
@@ -224,14 +224,14 @@ class Recipy(ConfigMixin):
                     current_gripper = required_gripper
 
     async def get_vane_from_oven(self, *args):
-        """Этот метод запускает группу атомарных действий RA по захвату лопатки из печи"""
+        """Этот метод запускает группу атомарных действий ra_api по захвату лопатки из печи"""
         oven = self.oven_unit
         atomic_params = {"name": "get_vane_from_oven",
                           "place": oven}
         await self.atomic_chain_execute(atomic_params)
 
     async def set_vane_in_oven(self, *args):
-        """Этот метод запускает группу атомарных действий RA по размещению лопатки в печи"""
+        """Этот метод запускает группу атомарных действий ra_api по размещению лопатки в печи"""
         oven_id = self.oven_unit
         atomic_params = {"name": "set_shovel",
                           "place": oven_id}
@@ -270,12 +270,12 @@ class Recipy(ConfigMixin):
         while not self.is_cut_station_free.is_set() and self.status != "failed_to_be_cooked":
             print("Танцуем с продуктом")
             await asyncio.sleep(1)
-            # добавить вызов RA танец с продуктом
+            # добавить вызов ra_api танец с продуктом
         await self.atomic_chain_execute(atomic_params)
 
     async def dish_packaging(self):
         """Этот метод запускает группу атомарных действий по упаковке пиццы"""
-        print("Начинаем упаковывать блюдо RA", time.time())
+        print("Начинаем упаковывать блюдо ra_api", time.time())
         atomic_params = {
             "name": "pack_pizza",
             "place": self.PACKING

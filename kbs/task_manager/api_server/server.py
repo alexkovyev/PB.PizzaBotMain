@@ -8,14 +8,15 @@ import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from data.server_confg.server_confg import (ServerConfig,
-                           ServerMessages,
-                           KioskModeNames)
-from controllers.ControllerBus import ControllersEvents, event_generator
-from kiosk_state.CookingMode import CookingMode
-from kiosk_state import StandByMode, TestingMode
-from notifications.discord_sender import DiscordBotAccess
-from server.equipment import Equipment
+from kbs.data.server_confg.server_confg import (ServerConfig,
+                                                ServerMessages,
+                                                KioskModeNames)
+from kbs.cntrls_api.ControllerBus import ControllersEvents, event_generator
+from kbs.task_manager.kiosk_state.CookingMode import CookingMode
+from kbs.task_manager.kiosk_state import StandByMode
+from kbs.task_manager.kiosk_state import TestingMode
+from kbs.notifications.discord_sender import DiscordBotAccess
+from kbs.task_manager.api_server.equipment import Equipment
 
 
 class PizzaBotMain(object):

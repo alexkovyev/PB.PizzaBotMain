@@ -3,7 +3,7 @@
 
 import discord
 
-from data.discord_confg.discord_confg import DiscordConfg
+from kbs.data.discord_confg.discord_confg import DiscordConfg
 
 
 operator_channel_name = DiscordConfg.DISCORD_OPERATOR_CHANNEL_NAME
