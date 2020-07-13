@@ -19,3 +19,5 @@ class ServerMessages(object):
     NOT_WORKING_HOURS = "Заказы не принимаем, приходите завтра"
 
     STATE_IS_ON_ALREADY = "Этот режим уже включен"
+    EMPTY_REQUEST_BODY = "Тело запроса пустое"
+    UNDEFINED_KEY_IN_JSON = "Ключ не распознан"

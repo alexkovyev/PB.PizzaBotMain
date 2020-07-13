@@ -15,25 +15,33 @@ class HandlersUtils(object):
     """
 
     @staticmethod
-    async def if_no_body_error_response(request):
+    async def if_no_body_error_response(request, text=ServerMessages.EMPTY_REQUEST_BODY):
         """
 
+        :param text:
         :param request:
         """
         if not request.body_exists:
-            raise web.HTTPNoContent(text="Пустое тело запроса")
+            raise web.HTTPNoContent(text=text, content_type='text/plain')
 
     @classmethod
-    async def get_params_from_request(cls, request, params_keys_value):
+    async def get_params_from_request(cls, request, params_keys):
         """
 
         :param request:
-        :param param_keys_list:
+        :param params_keys:
         :return:
         """
         await cls.if_no_body_error_response(request)
         request_body = await request.json()
-        return request_body
+        params_values_list = []
+        for param_key in params_keys:
+            try:
+                params_values_list.append(request_body[param_key])
+            except KeyError:
+                text = ServerMessages.UNDEFINED_KEY_IN_JSON
+                raise web.HTTPNoContent(text=text, content_type='text/plain')
+        return params_values_list
 
     @staticmethod
     async def get_future_result(future):

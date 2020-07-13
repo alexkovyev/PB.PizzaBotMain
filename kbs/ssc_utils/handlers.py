@@ -1,3 +1,6 @@
+"""
+Этот модуль солержит обработчики запросов апи сервера
+"""
 from aiohttp import web
 import asyncio
 
@@ -68,11 +71,8 @@ class Handlers(object):
         # await HandlersUtils.if_no_body_error_response(request)
         # request_body = await request.json()
         # new_order_id = request_body["check_code"]
-        new_order_id = await HandlersUtils.get_params_from_request(request)
-        try:
-            new_order_id
-        except KeyError:
-            pass
+        params_list = await HandlersUtils.get_params_from_request(request, ["check_code"])
+        new_order_id,  = params_list
         can_receive_new_order = await pizza_bot_main.is_open_for_new_orders()
         if can_receive_new_order:
             try:
@@ -129,9 +129,11 @@ class Handlers(object):
         """
 
         print("Получен запрос на статус команды")
-        await HandlersUtils.if_no_body_error_response(request)
-        request_body = await request.json()
-        command_uuid = request_body["command_uuid"]
+        params_list = await HandlersUtils.get_params_from_request(request, ["command_uuid"])
+        command_uuid,  = params_list
+        # await HandlersUtils.if_no_body_error_response(request)
+        # request_body = await request.json()
+        # command_uuid = request_body["command_uuid"]
         try:
             future_result = await HandlersUtils.proceed_future_result(command_uuid)
             return web.Response(text=future_result, content_type='text/plain')
@@ -194,12 +196,27 @@ class Handlers(object):
         """Этот метод обрабатывает запрос на тестирование отдельного узла"""
         current_kiosk_state = pizza_bot_main.current_state
         if current_kiosk_state == KioskModeNames.STANDBYMODE:
-            await HandlersUtils.if_no_body_error_response(request)
-            request_body = await request.json()
-            params = {"testing_type": ServerConfig.UNIT_TESTING_CODE,
-                      "unit_type": request_body["unit_type"],
-                      "unit_id": request_body["unit_id"]}
-            response = await self.turn_any_mode(self.testing_start, params)
+            key_list = ["testing_type", "unit_type", "unit_id"]
+            params_list = await HandlersUtils.get_params_from_request(request, key_list)
+            # await HandlersUtils.if_no_body_error_response(request)
+            # request_body = await request.json()
+            # params = {"testing_type": ServerConfig.UNIT_TESTING_CODE,
+            #           "unit_type": request_body["unit_type"],
+            #           "unit_id": request_body["unit_id"]}
+            response = await HandlersUtils.turn_any_mode(pizza_bot_main.testing_start, params_list)
             return web.Response(text=response, content_type='text/plain')
         else:
-            await HandlersUtils.response_state_is_busy()
+            await HandlersUtils.response_state_is_busy(current_kiosk_state)
+
+    @staticmethod
+    async def unit_activation_handler(request):
+        """Этот метод обрабатывает активацию отдельного узла"""
+        key_list = ["unit_type", "unit_id"]
+        params_list = await HandlersUtils.get_params_from_request(request, key_list)
+        # if not request.body_exists:
+        #     raise web.HTTPNoContent
+        # request_body = await request.json()
+        # params = {"unit_type": request_body["unit_type"],
+        #           "unit_id": request_body["unit_id"]}
+        message = await pizza_bot_main.unit_activation(params_list)
+        return web.Response(text=message, content_type='text/plain')

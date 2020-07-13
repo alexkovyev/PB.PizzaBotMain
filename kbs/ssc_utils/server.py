@@ -29,10 +29,10 @@ class Server():
             web.post("/api/new_order", Handlers.new_order_handler),
             web.post("/api/commands/cooking_mode", Handlers.turn_on_cooking_mode_handler),
             web.get("/api/commands/status", Handlers.status_command_handler),
-            # web.post("/api/commands/stopping_cooking_mode", self.turn_off_cooking_mode_handler),
+            # web.post("/api/commands/stopping_cooking_mode", Handlers.turn_off_cooking_mode_handler),
             web.post("/api/commands/full_system_testing", Handlers.start_full_testing_handler),
-            web.post("/api/commands/unit_testing", self.start_unit_testing_handler),
-            web.post("/api/commands/unit_activation", self.unit_activation_handler),
+            web.post("/api/commands/unit_testing", Handlers.start_unit_testing_handler),
+            web.post("/api/commands/unit_activation", Handlers.unit_activation_handler),
         ])
 
     def start_server(self):
