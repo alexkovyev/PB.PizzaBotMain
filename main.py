@@ -1,9 +1,11 @@
 import asyncio
 
-from kbs.task_manager.api_server.server import PizzaBotMain
+# from kbs.task_manager.api_server.server import
+from .kbs.task_manager.pbm import PizzaBotMain
 
 
 if __name__ == "__main__":
+    # app = PizzaBotMain()
     app = PizzaBotMain()
     asyncio.run(app.start_server())
 
@@ -12,7 +14,7 @@ if __name__ == "__main__":
 # import setuptools
 # import requirements
 
-
+ 
 # install_requires = []
 #
 #

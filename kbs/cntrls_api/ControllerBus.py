@@ -173,7 +173,7 @@ class Controllers(Movement):
         :param oven_unit: uuid4
                oven_mode: str
                program: int
-               time_changes_request: futura object
+               time_changes_request: future object
         oven_mode options:
         - "pre_heating"
         - "baking"

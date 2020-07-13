@@ -19,10 +19,3 @@ class ServerMessages(object):
     NOT_WORKING_HOURS = "Заказы не принимаем, приходите завтра"
 
     STATE_IS_ON_ALREADY = "Этот режим уже включен"
-
-
-class KioskModeNames(object):
-    STANDBYMODE = "Stand by"
-    BEFORECOOKING = "Подготовка к рабочему режиму"
-    COOKINGMODE = "Рабочий режим"
-    TESTINGMODE = "Режим тестирования"

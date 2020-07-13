@@ -7,7 +7,7 @@ from functools import partial
 
 from .BaseOrder import BaseOrder
 from kbs.exceptions import OvenReserveFailed
-from kbs.data.server_confg.server_confg import KioskModeNames
+from kbs.data.server_confg.server_const import KioskModeNames
 from kbs.redis.recipe_data import recipe_data
 from kbs.cntrls_api.ControllerBus import Controllers
 from kbs.task_manager.kiosk_state.BaseMode import BaseMode
