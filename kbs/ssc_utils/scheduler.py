@@ -5,21 +5,29 @@ from ..task_manager.pbm import pizza_bot_main
 
 
 class PbmScheduler(object):
+    """ Этот класс запускает определенные действия по расписанию, например, включение режима готовки
+    каждый день по расписанию
+    """
 
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
         self.add_planned_jobs()
 
     def add_planned_jobs(self):
-        """Этот метод создает планировщик для запуска команд по расписанию,
-        например, включение рабочего режима каждый день в заданное время
-        :return экземпляр класса AsyncIOScheduler
+        """Этот метод добавляет расписание запуска методов
         """
 
-        self.scheduler.add_job(self.turn_on_cooking_mode_scheduler, 'cron', day_of_week='*', hour='10', minute=0, second=0)
-        self.scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='21', minute=0, second=0)
+        self.scheduler.add_job(self.turn_on_cooking_mode_scheduler,
+                               'cron', day_of_week='*', hour='13', minute=27, second=30)
+        self.scheduler.add_job(self.turn_off_cooking_mode,
+                               'cron', day_of_week='*', hour='21', minute=0, second=0)
 
-    async def turn_on_cooking_mode_scheduler(self):
+    @staticmethod
+    async def turn_on_cooking_mode_scheduler():
+        """ Этот метод обрабатывает включение режима готовки по расписанию.
+        ДОДЕЛАТЬ: придумать обработку невозможности включения режима
+        """
+
         IMPOSSIBLE_TO_TURN_ON_STATES = [KioskModeNames.TESTINGMODE,
                                         KioskModeNames.COOKINGMODE,
                                         KioskModeNames.BEFORECOOKING]
@@ -36,15 +44,3 @@ class PbmScheduler(object):
         """Этот метод обрабатывает выключение режима готовки по расписанию
          НЕ сделано :( """
         pass
-
-
-# def create_scheduler(self):
-#     """Этот метод создает планировщик для запуска команд по расписанию,
-#     например, включение рабочего режима каждый день в заданное время
-#     :return экземпляр класса AsyncIOScheduler
-#     """
-#
-#     scheduler = AsyncIOScheduler()
-#     scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='10', minute=0, second=0)
-#     scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='21', minute=0, second=0)
-#     return scheduler

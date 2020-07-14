@@ -1,18 +1,16 @@
-"""
-Этот модуль солержит обработчики запросов апи сервера
-"""
+""" Этот модуль содержит обработчики запросов апи сервера """
+
 from aiohttp import web
 import asyncio
 
-from ..data.server.server_const import ServerMessages, ServerConfig
 from ..data.kiosk_modes.kiosk_modes import KioskModeNames
+from ..data.server.server_const import ServerMessages, ServerConfig
 from .handler_utils import HandlersUtils
 from ..task_manager.pbm import pizza_bot_main
 
 
 class Handlers(object):
-    """Это основной класс Handlers
-    """
+    """Это основной класс Handlers"""
 
     @classmethod
     async def kiosk_current_state_handler(cls, request):
@@ -69,11 +67,8 @@ class Handlers(object):
           description: "Ошибка сервера"
 
         """
-        # await HandlersUtils.if_no_body_error_response(request)
-        # request_body = await request.json()
-        # new_order_id = request_body["check_code"]
         params_list = await HandlersUtils.get_params_from_request(request, ["check_code"])
-        new_order_id,  = params_list
+        new_order_id, = params_list
         can_receive_new_order = await pizza_bot_main.is_open_for_new_orders()
         if can_receive_new_order:
             try:
@@ -94,8 +89,8 @@ class Handlers(object):
             message = ServerMessages.NOT_WORKING_HOURS
             raise web.HTTPNotAcceptable(text=message, content_type='text/plain')
 
-    @classmethod
-    async def status_command_handler(cls, request):
+    @staticmethod
+    async def status_command_handler(request):
         """Этот метод обрабатывает запрос о том, выполнена ли команда, отправленная на АПИ
 
         Description end-point
@@ -132,12 +127,8 @@ class Handlers(object):
         print("Получен запрос на статус команды")
         params_list = await HandlersUtils.get_params_from_request(request, ["command_uuid"])
         command_uuid,  = params_list
-        # await HandlersUtils.if_no_body_error_response(request)
-        # request_body = await request.json()
-        # command_uuid = request_body["command_uuid"]
         try:
-            future_result = await HandlersUtils.proceed_future_result(command_uuid)
-            print(future_result)
+            future_result = await HandlersUtils.process_future_result(command_uuid)
             return web.Response(text=future_result, content_type='text/plain')
         except KeyError:
             message = ServerMessages.UUID_COMMAND_NOT_FOUND
@@ -179,9 +170,27 @@ class Handlers(object):
 
     @staticmethod
     async def start_full_testing_handler(request):
-        """Этот метод обрабатывает запрос на запуск полного тестирования системы"""
+        """Этот метод обрабатывает запрос на запуск полного тестирования системы
+
+        Description end-point
+
+        produces:
+        - json
+
+        parameters: None
+
+        responses:
+        "200":
+          description: статус исполнения команды
+        "400":
+          description: режим включить нельзя, то есть активировано тестирование, ждем окончания
+        "406":
+          description: этот режим уже включен
+
+        """
         print("Получили запрос на включение режима тестирования")
         current_kiosk_state = pizza_bot_main.current_state
+
         if current_kiosk_state == KioskModeNames.COOKINGMODE:
             await HandlersUtils.response_state_is_busy(current_kiosk_state)
 
@@ -206,7 +215,7 @@ class Handlers(object):
             #           "unit_type": request_body["unit_type"],
             #           "unit_id": request_body["unit_id"]}
             response = await HandlersUtils.turn_any_mode(pizza_bot_main.testing_start, params_list)
-            return web.Response(text=response, content_type='text/plain')
+            return web.Response(text=response, content_type='application/json')
         else:
             await HandlersUtils.response_state_is_busy(current_kiosk_state)
 

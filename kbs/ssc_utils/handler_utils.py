@@ -65,7 +65,7 @@ class HandlersUtils(object):
         return True if future_result == str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE) else False
 
     @classmethod
-    async def proceed_future_result(cls, command_uuid):
+    async def process_future_result(cls, command_uuid):
         """ Этот метод ....
 
         :param command_uuid: str
@@ -79,7 +79,9 @@ class HandlersUtils(object):
 
     @staticmethod
     async def response_state_is_already_on():
-        """Это шаблон ответа, что запрашиваемый режим уже включен"""
+        """Это шаблон ответа, что запрашиваемый режим уже включен
+        406
+        """
         print("Этот режим уже включен")
         message = ServerMessages.STATE_IS_ON_ALREADY
         raise web.HTTPNotAcceptable(text=message)
@@ -87,6 +89,7 @@ class HandlersUtils(object):
     @staticmethod
     async def response_state_is_busy(kiosk_state):
         """Это шаблон ответа, что запрашиваемый режим включить нельзя
+        400
         """
         message = f"Активирован режим {kiosk_state}, включить не можем"
         raise web.HTTPBadRequest(text=message)

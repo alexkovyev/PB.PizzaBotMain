@@ -1,11 +1,9 @@
 import asyncio
 
-# from kbs.task_manager.api_server.server import
 from kbs.ssc_utils.server import Server
 
 
 if __name__ == "__main__":
-    # app = PizzaBotMain()
     app = Server()
     asyncio.run(app.start_server())
 

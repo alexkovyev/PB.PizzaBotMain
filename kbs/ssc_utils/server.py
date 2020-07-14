@@ -3,10 +3,9 @@ from aiohttp import web
 
 from ..data.server.server_const import ServerConfig
 from .handlers import Handlers
-from ..task_manager.pbm import pizza_bot_main
-# from .scheduler import create_scheduler
-from .scheduler import PbmScheduler
 from kbs.cntrls_api.ControllerBus import event_generator
+from ..task_manager.pbm import pizza_bot_main
+from .scheduler import PbmScheduler
 
 
 class Server():
@@ -60,7 +59,6 @@ class Server():
         """Это основай метод запуска работы приложения"""
         app = self.create_server()
         scheduler = PbmScheduler()
-        # scheduler = create_scheduler()
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.create_on_start_tasks(app, scheduler))
         loop.run_forever()
