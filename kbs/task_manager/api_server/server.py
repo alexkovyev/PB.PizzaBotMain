@@ -16,7 +16,7 @@ from kbs.task_manager.kiosk_state.CookingMode import CookingMode
 from kbs.task_manager.kiosk_state import StandByMode
 from kbs.task_manager.kiosk_state import TestingMode
 from kbs.notifications.discord_sender import DiscordBotAccess
-from kbs.task_manager.api_server.equipment import Equipment
+from kbs.task_manager.equipment import Equipment
 
 
 class PizzaBotMain(object):
@@ -217,7 +217,7 @@ class PizzaBotMain(object):
         try:
             future = self.command_status[command_uuid]
             future_result = await self.get_future_result(future)
-            if future_result == ServerMessages.SUCCEED_FUTURE_RESULT_CODE:
+            if future_result == str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE):
                 self.command_status.pop(command_uuid)
             return web.Response(text=future_result, content_type='text/plain')
         except KeyError:
@@ -339,7 +339,7 @@ class PizzaBotMain(object):
         (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
         self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
         if future is not None and not future.cancelled():
-            future.set_result(ServerMessages.SUCCEED_FUTURE_RESULT_CODE)
+            future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
         await self.current_instance.run()
 
     async def testing_start(self, future, *args):
@@ -360,7 +360,7 @@ class PizzaBotMain(object):
         # self.current_state = STANDBYMODE
         self.current_instance = StandByMode.StandBy()
         if future is not None and not future.cancelled():
-            future.set_result(ServerMessages.SUCCEED_FUTURE_RESULT_CODE)
+            future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
 
     async def is_open_for_new_orders(self):
         """Метод определяет можно ли принимать заказы.
@@ -422,7 +422,7 @@ class PizzaBotMain(object):
             else:
                 print("Меняем данные печи")
                 self.equipment.ovens.oven_units[unit_id].status = "free"
-            return ServerMessages.SUCCEED_FUTURE_RESULT_CODE
+            return str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE)
         except KeyError:
             return "Данные не найдены"
 

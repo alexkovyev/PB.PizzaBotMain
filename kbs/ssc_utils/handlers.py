@@ -32,6 +32,7 @@ class Handlers(object):
 
         """
         print("Получили запрос текущего статуса киоска")
+        print(pizza_bot_main.current_state)
         return web.Response(text=pizza_bot_main.current_state, content_type='text/plain')
 
     @classmethod
@@ -136,6 +137,7 @@ class Handlers(object):
         # command_uuid = request_body["command_uuid"]
         try:
             future_result = await HandlersUtils.proceed_future_result(command_uuid)
+            print(future_result)
             return web.Response(text=future_result, content_type='text/plain')
         except KeyError:
             message = ServerMessages.UUID_COMMAND_NOT_FOUND
@@ -178,7 +180,7 @@ class Handlers(object):
     @staticmethod
     async def start_full_testing_handler(request):
         """Этот метод обрабатывает запрос на запуск полного тестирования системы"""
-        print("Получили запрос на включение режима готовки")
+        print("Получили запрос на включение режима тестирования")
         current_kiosk_state = pizza_bot_main.current_state
         if current_kiosk_state == KioskModeNames.COOKINGMODE:
             await HandlersUtils.response_state_is_busy(current_kiosk_state)

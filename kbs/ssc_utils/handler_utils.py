@@ -40,6 +40,7 @@ class HandlersUtils(object):
                 params_values_list.append(request_body[param_key])
             except KeyError:
                 text = ServerMessages.UNDEFINED_KEY_IN_JSON
+                print("Ключ в запросе не найден")
                 raise web.HTTPNoContent(text=text, content_type='text/plain')
         return params_values_list
 
@@ -61,7 +62,7 @@ class HandlersUtils(object):
         :param future_result:
         :return: bool
         """
-        return True if future_result == ServerMessages.SUCCEED_FUTURE_RESULT_CODE else False
+        return True if future_result == str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE) else False
 
     @classmethod
     async def proceed_future_result(cls, command_uuid):
