@@ -442,6 +442,8 @@ class CookingMode(BaseMode):
     async def evaluation_status_to_set_mode(self, order_check_code):
         """Передает контроллу значение, на основании которого пользователю
         выводится информация о заказе на экране пункта выдачи
+        переделать на коды см в ноушн
+        если пицца не готова режим ожидания
         """
         CNTRLS_SET_MODE_OPTIONS = {1: "not_found",
                                    2: "in_progress",
@@ -461,7 +463,7 @@ class CookingMode(BaseMode):
                 print("статус блюда не распознан")
                 set_mode = "not_found"
         else:
-            set_mode = "not_foun*d"
+            set_mode = "not_found"
         return set_mode
 
     async def delivery_request_handler(self, order_check_code):

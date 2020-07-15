@@ -11,8 +11,9 @@ from .scheduler import PbmScheduler
 class Server():
 
     def create_server(self):
-        """Этот метод создает объект aiohttp сервера, а также привязывает к серверу routes api
-        для связи с внешними компонентами (админ панель и экран приема заказов)
+        """Этот метод создает объект aiohttp сервера, а также
+        привязывает к серверу routes api для связи с внешними
+        компонентами (админ панель и экран приема заказов)
         :return: экземпляр класса aiohttp.web
         """
 
@@ -29,7 +30,8 @@ class Server():
             web.post("/api/new_order", Handlers.new_order_handler),
             web.post("/api/commands/cooking_mode", Handlers.turn_on_cooking_mode_handler),
             web.get("/api/commands/status", Handlers.status_command_handler),
-            # web.post("/api/commands/stopping_cooking_mode", Handlers.turn_off_cooking_mode_handler),
+            # web.post("/api/commands/stopping_cooking_mode",
+            #          Handlers.turn_off_cooking_mode_handler),
             web.post("/api/commands/full_system_testing", Handlers.start_full_testing_handler),
             web.post("/api/commands/unit_testing", Handlers.start_unit_testing_handler),
             web.post("/api/commands/unit_activation", Handlers.unit_activation_handler),
@@ -52,7 +54,9 @@ class Server():
         # discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
         message_monitoring = asyncio.create_task(pizza_bot_main.message_sending_worker())
 
-        await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor, message_monitoring,
+        await asyncio.gather(controllers_bus, event_listener,
+                             is_able_to_cook_monitor,
+                             message_monitoring,
                              on_start_tasks)
 
     def start_server(self):

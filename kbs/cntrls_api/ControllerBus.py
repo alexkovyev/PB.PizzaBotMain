@@ -179,6 +179,7 @@ class Controllers(Movement):
         - "baking"
         - "stand_by"
         - "make_crust"
+        убрать режим
         :return
                sets data in time_changes_request {oven_id: unix_time} для всех печей, время которых изменилось
                result: bool or raise OvenError

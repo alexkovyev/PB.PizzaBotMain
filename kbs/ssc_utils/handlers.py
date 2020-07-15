@@ -1,4 +1,4 @@
-""" Этот модуль содержит обработчики запросов апи сервера """
+""" Этот модуль содержит обработчики запросов API сервера """
 
 from aiohttp import web
 import asyncio
@@ -33,10 +33,56 @@ class Handlers(object):
         print(pizza_bot_main.current_state)
         return web.Response(text=pizza_bot_main.current_state, content_type='text/plain')
 
+    @staticmethod
+    async def status_command_handler(request):
+        """Этот метод обрабатывает запрос о том, выполнена ли команда, отправленная на АПИ
+
+        Description end-point
+
+        produces:
+        - text/plain
+
+        parameters:
+        - in: body
+          name: body
+          description: Запрос о статусе завершения отправленной команды
+          required: true
+          schema:
+            type: object
+            properties:
+              command_uuid:
+                type: string
+
+        responses:
+        "200":
+          description: статус исполнения команды
+        "204":
+          description: тело запроса не найдено
+        "400":
+          description: uuid не найден
+        "500":
+          description: "Ошибка сервера"
+
+        command_uuid - это уникальный идентификатор команды, который генерируется сервером
+        в responce при запросе на api старт команды
+
+        """
+
+        print("Получен запрос на статус команды")
+        params_list = await HandlersUtils.get_params_from_request(request, ["command_uuid"])
+        command_uuid,  = params_list
+        try:
+            future_result = await HandlersUtils.process_future_result(command_uuid)
+            return web.Response(text=future_result, content_type='text/plain')
+        except KeyError:
+            message = ServerMessages.UUID_COMMAND_NOT_FOUND
+            raise web.HTTPBadRequest(text=message,
+                                     content_type='text/plain')
+
     @classmethod
     async def new_order_handler(cls, request):
-        """Этот метод обрабатывает запросы приема новых заказов в зависимости от текущего режима киоска,
-        запускает создание нового заказа при необходимости.
+        """Этот метод обрабатывает запросы приема новых заказов в зависимости
+        от текущего режима киоска, запускает создание нового заказа при необходимости.
 
         Description end-point
 
@@ -90,52 +136,6 @@ class Handlers(object):
             raise web.HTTPNotAcceptable(text=message, content_type='text/plain')
 
     @staticmethod
-    async def status_command_handler(request):
-        """Этот метод обрабатывает запрос о том, выполнена ли команда, отправленная на АПИ
-
-        Description end-point
-
-        produces:
-        - text/plain
-
-        parameters:
-        - in: body
-          name: body
-          description: Запрос о статусе завершения отправленной команды
-          required: true
-          schema:
-            type: object
-            properties:
-              command_uuid:
-                type: string
-
-        responses:
-        "200":
-          description: статус исполнения команды
-        "204":
-          description: тело запроса не найдено
-        "400":
-          description: uuid не найден
-        "500":
-          description: "Ошибка сервера"
-
-        command_uuid - это уникальный идентификатор команды, который генерируется сервером
-        в responce при запросе на api старт команды
-
-        """
-
-        print("Получен запрос на статус команды")
-        params_list = await HandlersUtils.get_params_from_request(request, ["command_uuid"])
-        command_uuid,  = params_list
-        try:
-            future_result = await HandlersUtils.process_future_result(command_uuid)
-            return web.Response(text=future_result, content_type='text/plain')
-        except KeyError:
-            message = ServerMessages.UUID_COMMAND_NOT_FOUND
-            raise web.HTTPBadRequest(text=message,
-                                     content_type='text/plain')
-
-    @staticmethod
     async def turn_on_cooking_mode_handler(request):
         """Этот метод обрабатывает запроса на включение режима готовки
 
@@ -148,7 +148,7 @@ class Handlers(object):
 
         responses:
         "200":
-          description: статус исполнения команды
+          description: uuid код для отслеживания статуса команды
         "400":
           description: режим включить нельзя, то есть активировано тестирование, ждем окончания
         "406":
@@ -177,11 +177,9 @@ class Handlers(object):
         produces:
         - json
 
-        parameters: None
-
         responses:
         "200":
-          description: статус исполнения команды
+          description: uuid код для отслеживания статуса команды
         "400":
           description: режим включить нельзя, то есть активировано тестирование, ждем окончания
         "406":
@@ -204,16 +202,44 @@ class Handlers(object):
 
     @staticmethod
     async def start_unit_testing_handler(request):
-        """Этот метод обрабатывает запрос на тестирование отдельного узла"""
+        """Этот метод обрабатывает запрос на тестирование отдельного узла
+        не доделано
+
+        Description end-point
+
+        produces:
+        - text/plain
+
+        parameters:
+        - in: body
+          name: body
+          description: Тестирование отдельного узла
+          required: true
+          schema:
+            type: object
+            properties:
+              testing_type:
+                type: string value: "UNIT"
+              unit_type:
+                type: string
+              unit_id:
+                type: string (uuid4)
+
+        responses:
+        "200":
+          description: uuid код для отслеживания статуса команды
+        "204":
+          description: Тело запроса не найдено или ключ не совпадает
+                       разделить потом на 2 ошибки
+        "400":
+          description: Киоск занят, включить не можем
+
+        """
+
         current_kiosk_state = pizza_bot_main.current_state
         if current_kiosk_state == KioskModeNames.STANDBYMODE:
             key_list = ["testing_type", "unit_type", "unit_id"]
             params_list = await HandlersUtils.get_params_from_request(request, key_list)
-            # await HandlersUtils.if_no_body_error_response(request)
-            # request_body = await request.json()
-            # params = {"testing_type": ServerConfig.UNIT_TESTING_CODE,
-            #           "unit_type": request_body["unit_type"],
-            #           "unit_id": request_body["unit_id"]}
             response = await HandlersUtils.turn_any_mode(pizza_bot_main.testing_start, params_list)
             return web.Response(text=response, content_type='application/json')
         else:
@@ -221,13 +247,35 @@ class Handlers(object):
 
     @staticmethod
     async def unit_activation_handler(request):
-        """Этот метод обрабатывает активацию отдельного узла"""
+        """Этот метод обрабатывает активацию отдельного узла
+
+        Description end-point
+
+        produces:
+        - text/plain
+
+        parameters:
+        - in: body
+          name: body
+          description: Активирование отдельного узла
+          required: true
+          schema:
+            type: object
+            properties:
+              unit_type:
+                type: string
+              unit_id:
+                type: string (uuid4)
+
+        responses:
+        "200":
+          description: успешно обновлено
+        "204":
+          description: Тело запроса не найдено или ключ не совпадает
+                       разделить потом на 2 ошибки
+
+        """
         key_list = ["unit_type", "unit_id"]
         params_list = await HandlersUtils.get_params_from_request(request, key_list)
-        # if not request.body_exists:
-        #     raise web.HTTPNoContent
-        # request_body = await request.json()
-        # params = {"unit_type": request_body["unit_type"],
-        #           "unit_id": request_body["unit_id"]}
         message = await pizza_bot_main.unit_activation(params_list)
         return web.Response(text=message, content_type='text/plain')
