@@ -45,7 +45,7 @@ class PizzaBotMain(object):
         На текущий момент просто проверят, что включен 'Рабочий режим' """
         return True if self.current_state == KioskModeNames.COOKINGMODE else False
 
-    async def cooking_mode_start(self, future=None):
+    async def cooking_mode_start(self, future=None, params=None):
         """Это метод непосредственно включает режим готовки
         Перед активацией режима готовки необходимо провести подготовительные процедуры:
         - обновить данные об оборудовании
@@ -64,24 +64,22 @@ class PizzaBotMain(object):
             future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
         await self.current_instance.run()
 
-    async def testing_start(self, future, *args):
+    async def testing_start(self, future, params):
         """ Это супер метод тестов"""
-        print("Это футура", future)
-        print(*args)
         self.current_instance = TestingMode.TestingMode()
+        testing_type, *_ = params
 
-        if args[0] == ServerConfig.FULL_TESTING_CODE:
+        if testing_type == ServerConfig.FULL_TESTING_CODE:
             # не сделано, поэтому просто sleep
             print("Запускаем тестирование, долгое")
             await asyncio.sleep(60)
 
-        elif args[0] == ServerConfig.UNIT_TESTING_CODE:
+        elif testing_type == ServerConfig.UNIT_TESTING_CODE:
             print("Запускаем тестирование узла")
             # не сделано, поэтому просто sleep
             await asyncio.sleep(20)
             print("Тестирование узла завершено")
 
-        # self.current_state = STANDBYMODE
         self.current_instance = StandByMode.StandBy()
         if future is not None and not future.cancelled():
             future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))

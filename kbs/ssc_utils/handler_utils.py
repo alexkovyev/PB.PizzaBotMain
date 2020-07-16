@@ -26,6 +26,74 @@ class HandlersUtils(object):
         if not request.body_exists:
             raise web.HTTPNoContent(text=text, content_type='text/plain')
 
+    @staticmethod
+    async def form_response_text_according_future_result(future, command_uuid):
+        """Этот метод проверяет статус футуры и в зависимости
+        от этого формирует текст для response
+        Если футура выполнена, она удаляется из словаря
+        pizza_bot_main.command_status
+
+        :param future: экземпляр класса _asyncio.Future
+        :param command_uuid: str uuid4
+
+        :return str
+        """
+
+        if future.done():
+            try:
+                future_result = future.result()
+                pizza_bot_main.command_status.pop(command_uuid)
+            except asyncio.CancelledError:
+                future_result = ServerMessages.CANCELLED_FUTURE_MESSAGE
+        else:
+            future_result = ServerMessages.PENDING_FUTURE_RESULT
+        return future_result
+
+    @staticmethod
+    async def response_state_is_already_on():
+        """Это шаблон ответа, что запрашиваемый режим уже включен
+        :raise 406
+        """
+        print("Этот режим уже включен")
+        message = ServerMessages.STATE_IS_ON_ALREADY
+        raise web.HTTPNotAcceptable(text=message)
+
+    @staticmethod
+    async def response_state_is_busy(kiosk_state):
+        """Это шаблон ответа, что запрашиваемый режим включить нельзя
+
+        :raise 400 и текст
+        """
+        message = f"Активирован режим {kiosk_state}, включить не можем"
+        raise web.HTTPBadRequest(text=message, content_type="text/plain")
+
+    @staticmethod
+    async def create_result_future():
+        """Этот метод создает футуру на каждый запрос выполнения команды, отпарвленный на API
+        добавляет в словарь всех футур
+        :returns tuple (str, экземпляр класса _asyncio.Future)
+
+        """
+        operation_result = asyncio.get_running_loop().create_future()
+        operation_result_uuid = str(uuid.uuid4())
+        pizza_bot_main.command_status[operation_result_uuid] = operation_result
+        return operation_result_uuid, operation_result
+
+    @classmethod
+    async def process_future_result(cls, command_uuid):
+        """ Этот метод запускает формирование response
+        о статусе выполнения команды, отправленной
+        из админ панели
+
+        :param command_uuid: str
+
+        :return future_result: str or KeyError если uuid команды
+        не найден
+        """
+        future = pizza_bot_main.command_status[command_uuid]
+        future_result = await cls.form_response_text_according_future_result(future, command_uuid)
+        return future_result
+
     @classmethod
     async def get_params_from_request(cls, request, params_keys):
         """Этот метод обрабатывает запрос:
@@ -53,79 +121,14 @@ class HandlersUtils(object):
                 raise web.HTTPNoContent(text=text, content_type='text/plain')
         return params_values_list
 
-    @staticmethod
-    async def form_response_text_according_future_result(future):
-        """Этот метод проверяет статус футуры и в зависимости
-        от этог формирует текст для response
-
-        :param future: экземпляр класса _asyncio.Future
-
-        :return str
-        """
-
-        if future.done():
-            try:
-                future_result = future.result()
-            except asyncio.CancelledError:
-                future_result = ServerMessages.CANCELLED_FUTURE_MESSAGE
-        else:
-            future_result = ServerMessages.PENDING_FUTURE_RESULT
-        return future_result
-
-    @staticmethod
-    async def is_future_succeed(future_result):
-        """ Метод проверяет успешно ли выполнена футура
-        :param future_result:
-        :return: bool
-        """
-        return True if future_result == str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE) else False
-
     @classmethod
-    async def process_future_result(cls, command_uuid):
-        """ Этот метод ....
-
-        :param command_uuid: str
-        """
-        future = pizza_bot_main.command_status[command_uuid]
-        future_result = await cls.form_response_text_according_future_result(future)
-        is_future_succeed = await cls.is_future_succeed(future_result)
-        if is_future_succeed:
-            pizza_bot_main.command_status.pop(command_uuid)
-        return future_result
-
-    @staticmethod
-    async def response_state_is_already_on():
-        """Это шаблон ответа, что запрашиваемый режим уже включен
-        406
-        """
-        print("Этот режим уже включен")
-        message = ServerMessages.STATE_IS_ON_ALREADY
-        raise web.HTTPNotAcceptable(text=message)
-
-    @staticmethod
-    async def response_state_is_busy(kiosk_state):
-        """Это шаблон ответа, что запрашиваемый режим включить нельзя
-        Возвращает код ошибки 400 и текст
-        """
-        message = f"Активирован режим {kiosk_state}, включить не можем"
-        raise web.HTTPBadRequest(text=message, content_type="text/plain")
-
-    @staticmethod
-    async def create_result_future():
-        """Этот метод создает футуру на каждый запрос выполнения команды, отпарвленный на API
-        добавляет в словарь всех футур """
-        operation_result = asyncio.get_running_loop().create_future()
-        operation_result_uuid = str(uuid.uuid4())
-        pizza_bot_main.command_status[operation_result_uuid] = operation_result
-        return operation_result_uuid, operation_result
-
-    @classmethod
-    async def turn_any_mode(cls, task_name, *args):
+    async def turn_any_mode(cls, task_name, params=None):
         """Этот метод включает заданный режим киоска по запросу, отправленному на API
         :param task_name: небходимый метод
+        :param params: list
         """
         print("Ок, включаем")
         operation_result_uuid, operation_result = await cls.create_result_future()
-        asyncio.create_task(task_name(operation_result, *args))
+        asyncio.create_task(task_name(operation_result, params))
         response = f"uuid:{operation_result_uuid}"
         return response

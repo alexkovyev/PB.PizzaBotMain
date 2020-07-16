@@ -193,7 +193,7 @@ class Handlers(object):
             await HandlersUtils.response_state_is_busy(current_kiosk_state)
 
         elif current_kiosk_state == KioskModeNames.STANDBYMODE:
-            params = {"testing_type": ServerConfig.FULL_TESTING_CODE}
+            params = [ServerConfig.FULL_TESTING_CODE]
             response = await HandlersUtils.turn_any_mode(pizza_bot_main.testing_start, params)
             return web.Response(text=response, content_type='text/plain')
 
