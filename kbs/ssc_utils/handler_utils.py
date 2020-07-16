@@ -4,6 +4,7 @@
 from aiohttp import web
 import asyncio
 import uuid
+import json
 
 from ..data.server.server_const import ServerMessages
 from ..task_manager.pbm import pizza_bot_main
@@ -110,12 +111,15 @@ class HandlersUtils(object):
         """
 
         await cls.if_no_body_error_response(request)
-        request_body = await request.json()
+        try:
+            request_body = await request.json()
+        except json.decoder.JSONDecodeError:
+            raise web.HTTPNoContent(text="ошибка в json", content_type="text/plain")
         params_values_list = []
         for param_key in params_keys:
             try:
                 params_values_list.append(request_body[param_key])
-            except KeyError:
+            except (KeyError, TypeError):
                 text = ServerMessages.UNDEFINED_KEY_IN_JSON
                 print("Ключ в запросе не найден")
                 raise web.HTTPNoContent(text=text, content_type='text/plain')
