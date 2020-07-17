@@ -14,6 +14,7 @@ from kbs.task_manager.kiosk_state.BaseMode import BaseMode
 from kbs.ra_api.RA import RA
 from .recipe_class import Recipy
 from kbs.exceptions import OvenReservationError
+from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 
 
 class BeforeCooking(BaseMode):
@@ -286,7 +287,7 @@ class CookingMode(BaseMode):
             print("Готовим блюдо", chain_to_do.__self__.id)
             await chain_to_do(params, self)
 
-    async def run(self):
+    async def start(self):
         """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""
 
         asyncio.create_task(self.time_changes_monitor())
@@ -310,9 +311,12 @@ class CookingMode(BaseMode):
     async def dish_inform_monitor(self):
         while True:
             time_list = []
+            time_from = time.time() + CookingModeConst.DISH_BEFORE_READY_INFORM_TIME
+            time_till = time_from + 1
             for oven in self.equipment.ovens.oven_units.values():
-                if oven.stop_baking_time is not None and oven.stop_baking_time > (time.time() +10) and \
-                        oven.stop_baking_time < (time.time() +11):
+                if oven.stop_baking_time is not None and time_from < oven.stop_baking_time < time_till:
+                # if oven.stop_baking_time is not None and oven.stop_baking_time > (time.time() +10) and \
+                #         oven.stop_baking_time < (time.time() +11):
                     print("Это время окончания выпечки в печи", oven.stop_baking_time)
                     print(time.time())
                     print("Это блюдо", oven.dish)

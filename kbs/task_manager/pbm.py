@@ -62,7 +62,7 @@ class PizzaBotMain(object):
         self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
         if future is not None and not future.cancelled():
             future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
-        await self.current_instance.run()
+        await self.current_instance.start()
 
     async def testing_start(self, future, params):
         """ Это супер метод тестов"""
