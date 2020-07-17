@@ -89,7 +89,7 @@ class PizzaBotMain(object):
         """
         app.add_routes([
             web.get("/api/current_state", self.kiosk_current_state_handler),
-            web.post("/api/new_order", self.new_order_handler),
+            web.post("/api/new_order_id", self.new_order_handler),
             web.post("/api/commands/cooking_mode", self.turn_on_cooking_mode_handler),
             web.get("/api/commands/status", self.status_command_handler),
             # web.post("/api/commands/stopping_cooking_mode", self.turn_off_cooking_mode_handler),

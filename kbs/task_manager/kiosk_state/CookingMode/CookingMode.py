@@ -92,18 +92,22 @@ class CookingMode(BaseMode):
         self.main_queue = asyncio.Queue()
         self.high_priority_queue = asyncio.Queue()
         self.low_priority_queue = asyncio.Queue()
+        # wtf? что за лимит
         self.is_limit_active = asyncio.Event()
 
     @property
     def is_downtime(self):
-        """Проверяет можно ли танцеать, те все очереди пустые"""
+        """Проверяет можно ли танцеать, те все очереди пустые
+        :return bool
+        """
         return all(map(lambda p: p.empty(),
                        (self.main_queue, self.low_priority_queue, self.high_priority_queue)))
 
     async def checking_order_for_double(self, new_order_id):
         """Этот метод проверяет есть ли уже заказ с таким ref id в обработке
         :param new_order_id: str
-        :return bool"""
+        :return bool
+        """
         return True if new_order_id not in self.current_orders_proceed else False
 
     async def get_order_content_from_db(self, new_order_id):
@@ -200,7 +204,7 @@ class CookingMode(BaseMode):
         'additive': {'id': 1, 'recipe': {1: 5}}}]}
 """
 
-        # print("Входные данные", new_order)
+        # print("Входные данные", new_order_id)
 
         async def create_sauce_recipe(self, dish):
             """Этот метод выбирает рецепт для конкретного компонента соуса из общей базы рецептов"""
@@ -246,7 +250,7 @@ class CookingMode(BaseMode):
     async def create_new_order(self, new_order):
         """Этот метод создает экземпляр класса Order и заносит его в словарь self.current_orders_proceed
         @:params:
-        new_order - это словарь с блюдами, получаемый из БД в рамках метода get_order_content_from_db """
+        new_order_id - это словарь с блюдами, получаемый из БД в рамках метода get_order_content_from_db """
 
         order_content = await self.get_order_content_from_db(new_order)
         await self.get_recipe_data(order_content["dishes"])
@@ -325,7 +329,8 @@ class CookingMode(BaseMode):
             await asyncio.sleep(1)
 
     async def time_changes_monitor(self):
-        """Отслеживает наступление события изменения времени выпечки для информирования о готовности блюд
+        """Отслеживает наступление события изменения времени
+        выпечки для информирования о готовности блюд
         """
         while True:
             await self.oven_time_changes_event["event"].wait()
