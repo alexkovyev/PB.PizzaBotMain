@@ -5,7 +5,7 @@ import time
 
 from functools import partial
 
-from .BaseOrder import BaseOrder
+from .base_order import BaseOrder
 from kbs.exceptions import OvenReserveFailed
 from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
 from kbs.redis.recipe_data import recipe_data
@@ -276,11 +276,10 @@ class CookingMode(BaseMode):
         for chain in chains:
             await queue.put(chain)
 
-    async def unpack_chain_data(self, queue, params=None):
+    async def run_chain(self, chain_to_do, params=None):
         """Этот метод распаковывает кортеж, проверяет можно ли готовить блюдо
         (те статус блюда не STOP_STATUS) и запускает чейн с параметрами """
         print("Начинаем распаковку")
-        chain_to_do = await queue.get()
         if isinstance(chain_to_do, tuple):
             chain_to_do, params = chain_to_do
         if chain_to_do.__self__.status != self.STOP_STATUS:
@@ -304,7 +303,8 @@ class CookingMode(BaseMode):
                     await self.high_priority_queue.get()
                 elif not self.main_queue.empty():
                     print("Вернулись в очередь main")
-                    await self.unpack_chain_data(self.main_queue)
+                    chain_to_do = await self.main_queue.get()
+                    await self.run_chain(chain_to_do)
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
 
@@ -327,7 +327,7 @@ class CookingMode(BaseMode):
                 for dish in time_list:
                     print("Записываем статус блюда на почти готово", dish)
                     dish_object = await self.get_dish_object(dish)
-                    print("Это номер заказа", dish_object.one_dish_order)
+                    print("Это единственное блюдо в заказе?", dish_object.one_dish_order)
                     if dish_object.one_dish_order:
                         print("заказ почти готов", dish_object.order_ref_id)
             await asyncio.sleep(1)

@@ -7,7 +7,9 @@ from kbs.data.server.server_const import ServerConfig, ServerMessages
 from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
 from kbs.cntrls_api.ControllerBus import ControllersEvents, event_generator
 from kbs.notifications.discord_sender import DiscordBotAccess
-from kbs.task_manager.kiosk_state.CookingMode import CookingMode
+# from kbs.task_manager.kiosk_state.CookingMode import CookingMode
+from kbs.task_manager.kiosk_state.CookingMode.mode_main import CookingMode
+from kbs.task_manager.kiosk_state.CookingMode.before_cooking import BeforeCooking
 from kbs.task_manager.kiosk_state import StandByMode
 from kbs.task_manager.kiosk_state import TestingMode
 
@@ -31,13 +33,13 @@ class PizzaBotMain(object):
         корретного ответа сервера на запросы на Api
         :return: str
         """
-        if isinstance(self.current_instance, CookingMode.CookingMode):
+        if isinstance(self.current_instance, CookingMode):
             return KioskModeNames.COOKINGMODE
         elif isinstance(self.current_instance, StandByMode.StandBy):
             return KioskModeNames.STANDBYMODE
         elif isinstance(self.current_instance, TestingMode.TestingMode):
             return KioskModeNames.TESTINGMODE
-        elif isinstance(self.current_instance, CookingMode.BeforeCooking):
+        elif isinstance(self.current_instance, BeforeCooking):
             return KioskModeNames.BEFORECOOKING
 
     async def is_open_for_new_orders(self):
@@ -54,12 +56,12 @@ class PizzaBotMain(object):
         :param future: объект футуры, создаваемый при запуске режиме через АПИ
         """
         print("ЗАПУСКАЕМ режим ГОТОВКИ")
-        self.current_instance = CookingMode.BeforeCooking()
+        self.current_instance = BeforeCooking()
         if self.equipment is None:
             print("ОШИБКА ОБОРУДОВАНИЯ")
             self.equipment = await self.add_equipment_data()
-        (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
-        self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
+        (is_ok, self.equipment), recipe = await BeforeCooking.start_pbm(self.equipment)
+        self.current_instance = CookingMode(recipe, self.equipment)
         if future is not None and not future.cancelled():
             future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
         await self.current_instance.start()

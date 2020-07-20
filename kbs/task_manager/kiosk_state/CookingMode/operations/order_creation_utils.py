@@ -1,7 +1,7 @@
 """Этот модуль содержит методы, используемые
 при создании нового заказа """
 
-from ..BaseOrder import BaseOrder
+from ..base_order import BaseOrder
 from kbs.exceptions import OvenReserveFailed, OvenReservationError
 
 
@@ -158,16 +158,16 @@ class CreateOrder(object):
         except OvenReservationError:
             raise OvenReserveFailed("Ошибка назначения печей на заказ. Нет свободных печей")
 
+    @classmethod
     async def data_preperaion_for_new_order(cls, new_order_id, recipe_data):
         order_content = await cls.get_order_content_from_db(new_order_id)
         await cls.get_recipe_data(recipe_data, order_content["dishes"])
         return order_content
 
+    @classmethod
     async def oven_reservation(cls, order_content, equipment_data):
         try:
             ovens_reserved = await cls.reserve_oven(order_content, equipment_data)
+            return ovens_reserved
         except OvenReserveFailed:
             pass
-        return ovens_reserved
-
-

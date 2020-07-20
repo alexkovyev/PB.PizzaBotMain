@@ -1,10 +1,12 @@
 import asyncio
 import time
 
+from .base_order import BaseOrder
+from .cooking_mode_utils import Utils
 from .operations.order_creation_utils import CreateOrder
-from .BaseOrder import BaseOrder
 from kbs.exceptions import OvenReserveFailed
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
+from kbs.ra_api.RA import RA
 
 
 class CookingMode(object):
@@ -49,6 +51,12 @@ class CookingMode(object):
         """
         return True if new_order_id not in self.current_orders_proceed else False
 
+    async def put_chains_in_queue(self, dish, queue):
+        """Добавляет чейны рецепта в очередь в виде кортежа (dish, chain)"""
+        chains = dish.chain_list
+        for chain in chains:
+            await queue.put(chain)
+
     async def create_new_order(self, new_order_id):
         """Этот метод создает экземпляр класса Order и
          заносит его в словарь self.current_orders_proceed
@@ -57,8 +65,7 @@ class CookingMode(object):
 
         """
 
-        order_content = await CreateOrder.data_preperaion_for_new_order(new_order_id,
-                                                                        self.recipes)
+        order_content = await CreateOrder.data_preperaion_for_new_order(new_order_id, self.recipes)
         try:
             ovens_reserved = await CreateOrder.reserve_oven(order_content, self.equipment)
         except OvenReserveFailed:
@@ -82,7 +89,9 @@ class CookingMode(object):
         print(futura_result)
         for oven in futura_result:
             print(oven)
-            self.equipment.ovens.oven_units[oven].stop_baking_time = futura_result[oven]
+            lock = asyncio.Lock()
+            async with lock:
+                self.equipment.ovens.oven_units[oven].stop_baking_time = futura_result[oven]
             print("Это результат сетера", self.equipment.ovens.oven_units[oven].stop_baking_time)
 
     async def clear_time_changes_monitor(self):
@@ -112,10 +121,9 @@ class CookingMode(object):
             #     self.oven_time_changes_event["result"] = None
 
     async def select_almost_ready_dishes(self):
-        # убрать магическое число
         dish_list = []
         time_from = time.time() + CookingModeConst.DISH_BEFORE_READY_INFORM_TIME
-        time_till = time_from + 1
+        time_till = time_from + CookingModeConst.DISH_ALMOST_READY_CHECKING_GAP
         for oven in self.equipment.ovens.oven_units.values():
             if oven.stop_baking_time is not None and time_from < oven.stop_baking_time < time_till:
                 print("Это время окончания выпечки в печи", oven.stop_baking_time)
@@ -123,27 +131,40 @@ class CookingMode(object):
                 print("Это блюдо", oven.dish)
                 dish_list.append(oven.dish)
                 print("записали в список", dish_list)
+        return dish_list
+
+    async def dish_stop_baking_time_handler(self, dish_list):
+        """
+
+        :param dish_list:
+        """
+        for dish in dish_list:
+            print("Записываем статус блюда на почти готово", dish)
+            dish_object = await Utils.get_dish_object(dish, self.current_orders_proceed)
+            print("Это номер заказа", dish_object.one_dish_order)
+            if dish_object.one_dish_order:
+                print("заказ почти готов", dish_object.order_ref_id)
 
     async def dish_inform_monitor(self):
+        """
+
+        """
         while True:
-            time_list = []
-            for oven in self.equipment.ovens.oven_units.values():
-                if oven.stop_baking_time is not None and oven.stop_baking_time > (time.time() +10) and \
-                        oven.stop_baking_time < (time.time() +11):
-                    print("Это время окончания выпечки в печи", oven.stop_baking_time)
-                    print(time.time())
-                    print("Это блюдо", oven.dish)
-                    time_list.append(oven.dish)
-                    print("записали в список", time_list)
-            print("Это временной список для готовности блюда", time_list)
-            if time_list:
-                for dish in time_list:
-                    print("Записываем статус блюда на почти готово", dish)
-                    dish_object = await self.get_dish_object(dish)
-                    print("Это номер заказа", dish_object.one_dish_order)
-                    if dish_object.one_dish_order:
-                        print("заказ почти готов", dish_object.order_ref_id)
-            await asyncio.sleep(1)
+            dish_list = await self.select_almost_ready_dishes()
+            print("Это временной список для готовности блюда", dish_list)
+            if dish_list:
+                await self.dish_stop_baking_time_handler(dish_list)
+            await asyncio.sleep(CookingModeConst.DISH_ALMOST_READY_CHECKING_GAP)
+
+    async def run_chain(self, chain_to_do, params=None):
+        """Этот метод распаковывает кортеж, проверяет можно ли готовить блюдо
+        (те статус блюда не STOP_STATUS) и запускает чейн с параметрами """
+        print("Начинаем распаковку")
+        if isinstance(chain_to_do, tuple):
+            chain_to_do, params = chain_to_do
+        if chain_to_do.__self__.status != self.STOP_STATUS:
+            print("Готовим блюдо", chain_to_do.__self__.id)
+            await chain_to_do(params, self)
 
     async def start(self):
         """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""
@@ -162,6 +183,7 @@ class CookingMode(object):
                     await self.high_priority_queue.get()
                 elif not self.main_queue.empty():
                     print("Вернулись в очередь main")
-                    await self.unpack_chain_data(self.main_queue)
+                    chain_to_do = await self.main_queue.get()
+                    await self.run_chain(chain_to_do)
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
