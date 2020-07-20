@@ -2,5 +2,4 @@
 /config/discord_confg/bot_token.txt
 /.idea/
 /try_some_code.py
-/kbs/task_manager/api_server/*
-/kbs/task_manager/kiosk_state/CookingMode/CookingMode.py
+/old_versions/

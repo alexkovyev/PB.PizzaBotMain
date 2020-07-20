@@ -8,14 +8,15 @@ import uuid
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config.config import (ServerConfig,
-                           KioskModeNames)
-from kbs.controllers.ControllerBus import ControllersEvents, event_generator
-from kbs.task_manager.kiosk_state.CookingMode import CookingMode
+from kbs.data.server.server_const import (ServerConfig,
+                                          ServerMessages)
+from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
+from kbs.cntrls_api.ControllerBus import ControllersEvents, event_generator
+from old_versions import CookingMode
 from kbs.task_manager.kiosk_state import StandByMode
 from kbs.task_manager.kiosk_state import TestingMode
 from kbs.notifications.discord_sender import DiscordBotAccess
-from kbs.task_manager.server.equipment import Equipment
+from kbs.task_manager.equipment import Equipment
 
 
 class PizzaBotMain(object):
@@ -48,9 +49,9 @@ class PizzaBotMain(object):
 
     @property
     def current_state(self):
-        """ Этот метод определяет тип
-
-        :return:
+        """ Этот метод определяет текущий режим работы киоска для формирования
+        корретного ответа сервера на запросы на Api
+        :return: str
         """
         if isinstance(self.current_instance, CookingMode.CookingMode):
             return KioskModeNames.COOKINGMODE
@@ -62,30 +63,35 @@ class PizzaBotMain(object):
             return KioskModeNames.BEFORECOOKING
 
     def create_server(self):
-        """Этот метод создает приложение aiohttp сервера, а также привязывает routes api
+        """Этот метод создает объект aiohttp сервера, а также привязывает к серверу routes api
         для связи с внешними компонентами (админ панель и экран приема заказов)
-        :return: aiohttp api_server app instance
+        :return: экземпляр класса aiohttp.web
         """
+
         app = web.Application()
         self.setup_routes(app)
         return app
 
     def create_scheduler(self):
-        """Этот метод создает планровщик для запуска команд по расписанию"""
+        """Этот метод создает планировщик для запуска команд по расписанию,
+        например, включение рабочего режима каждый день в заданное время
+        :return экземпляр класса AsyncIOScheduler
+        """
+
         scheduler = AsyncIOScheduler()
         scheduler.add_job(self.turn_on_cooking_mode, 'cron', day_of_week='*', hour='10', minute=0, second=0)
         scheduler.add_job(self.turn_off_cooking_mode, 'cron', day_of_week='*', hour='21', minute=0, second=0)
         return scheduler
 
     def setup_routes(self, app):
-        """ Этот метод связывает доступные эндпоинты и обработчики
-        :param app: aiohttp api_server app instance
+        """ Этот метод связывает доступные эндпоинты и обработчики запросов.
+        :param app: экземпляр класса aiohttp.web
         """
         app.add_routes([
             web.get("/api/current_state", self.kiosk_current_state_handler),
             web.post("/api/new_order_id", self.new_order_handler),
-            web.post("/api/commands/cooking_mode", self.turn_cooking_mode_handler),
-            web.get("/api/commands/status", self.status_command),
+            web.post("/api/commands/cooking_mode", self.turn_on_cooking_mode_handler),
+            web.get("/api/commands/status", self.status_command_handler),
             # web.post("/api/commands/stopping_cooking_mode", self.turn_off_cooking_mode_handler),
             web.post("/api/commands/full_system_testing", self.start_full_testing_handler),
             web.post("/api/commands/unit_testing", self.start_unit_testing_handler),
@@ -96,70 +102,158 @@ class PizzaBotMain(object):
     async def new_order_handler(self, request):
         """Этот метод обрабатывает запросы приема новых заказов в зависимости от текущего режима киоска,
         запускает создание нового заказа при необходимости.
+
+        Description end-point
+
+        produces:
+        - text/plain
+
+        parameters:
+        - in: body
+          name: body
+          description: Новый заказ пользователя
+          required: true
+          schema:
+            type: object
+            properties:
+              check_code:
+                type: string
+
+        responses:
+        "200":
+          description: "Заказ уже находится в обработке"
+        "201":
+          description: "Заказ успешно принят"
+        "204":
+          description: Тело запроса не найдено
+        "406":
+          description: "Заказ не может быть принят из-за текущего режима работы"
+        "500":
+          description: "Ошибка сервера"
+
         """
         if not request.body_exists:
             raise web.HTTPNoContent
         request_body = await request.json()
-        new_order_id = request_body[ServerConfig.NEW_ORDER_ID_KEY]
+        new_order_id = request_body["check_code"]
         can_receive_new_order = await self.is_open_for_new_orders()
         if can_receive_new_order:
             try:
                 is_it_new_order = await self.current_instance.checking_order_for_double(new_order_id)
                 if is_it_new_order:
                     await asyncio.create_task(self.current_instance.create_new_order(new_order_id))
-                    message = "Заказ успешно принят"
-                    raise web.HTTPCreated(text=message)
+                    message = ServerMessages.ORDER_CREATED_MESSAGE
+                    raise web.HTTPCreated(text=message, content_type='text/plain')
                 else:
-                    message = "Этот заказ уже находится в обработке"
-                    raise web.HTTPOk(text=message)
+                    message = ServerMessages.DOUBLE_ORDER_MESSAGE
+                    raise web.HTTPOk(text=message, content_type='text/plain')
             except AttributeError:
                 print("Не создан инстанс cooking mode или метод не найден")
-                raise web.HTTPServerError(text="Ошибка века в сервере")
+                message = ServerConfig.SERVER_ERROR_MESSAGE
+                raise web.HTTPInternalServerError(text=message,
+                                                  content_type='text/plain')
         else:
-            message = "Заказы не принимаем, приходите завтра"
-            raise web.HTTPNotAcceptable(text=message)
+            message = ServerMessages.NOT_WORKING_HOURS
+            raise web.HTTPNotAcceptable(text=message, content_type='text/plain')
 
     async def kiosk_current_state_handler(self, request):
-        """Этот метод обрабатывает запрос на Апи о получении данных о текущем статусе киоска
-        Может быть:
-        - Stand_by
-        - Testing
-        - Before_cooking
-        - Cooking
+        """Этот метод обрабатывает запрос на Апи о получении данных о текущем статусе киоска.
+
+        Description end-point
+
+        produces:
+        - text/plain
+
+        parameters:
+        - None
+
+        responses:
+        "200":
+          description: Название текущего режима работы киоска
+
         """
         print("Получили запрос текущего статуса киоска")
-        current_state = self.current_state
-        return web.Response(text=current_state)
+        return web.Response(text=self.current_state, content_type='text/plain')
 
-    async def status_command(self, request):
-        """Этот метод обрабатывает запрос о том, выполнена ли команда, отправленная на АПИ"""
+    async def status_command_handler(self, request):
+        """Этот метод обрабатывает запрос о том, выполнена ли команда, отправленная на АПИ
 
-        print("Запрос на статус команды")
+        Description end-point
+
+        produces:
+        - text/plain
+
+        parameters:
+        - in: body
+          name: body
+          description: Запрос о статусе завершения отправленной команды
+          required: true
+          schema:
+            type: object
+            properties:
+              command_uuid:
+                type: string
+
+        responses:
+        "200":
+          description: статус исполнения команды
+        "204":
+          description: тело запроса не найдено
+        "400":
+          description: uuid не найден
+        "500":
+          description: "Ошибка сервера"
+
+        command_uuid - это уникальный идентификатор команды, который генерируется сервером
+        в responce при запросе на api старт команды
+
+        """
+
+        print("Получен запрос на статус команды")
         if not request.body_exists:
             raise web.HTTPNoContent
         request_body = await request.json()
         command_uuid = request_body["command_uuid"]
         try:
-            result = await self.get_futura_result(self.command_status[command_uuid])
-            if result == ServerConfig.SUCCEED_FUTURA_RESULT_CODE:
+            future = self.command_status[command_uuid]
+            future_result = await self.get_future_result(future)
+            if future_result == str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE):
                 self.command_status.pop(command_uuid)
-            return web.Response(text=result)
+            return web.Response(text=future_result, content_type='text/plain')
         except KeyError:
-            raise web.HTTPBadRequest(text="uuid не найден")
+            message = ServerMessages.UUID_COMMAND_NOT_FOUND
+            raise web.HTTPBadRequest(text=message,
+                                     content_type='text/plain')
 
-    async def turn_cooking_mode_handler(self, request):
-        """Этот метод обрабатывает запроса на включение режима готовки """
+    async def turn_on_cooking_mode_handler(self, request):
+        """Этот метод обрабатывает запроса на включение режима готовки
+
+        Description end-point
+
+        produces:
+        - json
+
+        parameters: None
+
+        responses:
+        "200":
+          description: статус исполнения команды
+        "400":
+          description: режим включить нельзя, то есть активировано тестирование, ждем окончания
+        "406":
+          description: этот режим уже включен
+         """
         print("Получили запрос на включение режима готовки")
         if (self.current_state == KioskModeNames.COOKINGMODE or
                 self.current_state == KioskModeNames.BEFORECOOKING):
-            await self.responce_state_is_already_on()
+            await self.response_state_is_already_on()
 
         elif self.current_state == KioskModeNames.STANDBYMODE:
             response = await self.turn_any_mode(self.cooking_mode_start)
             return web.Response(text=response)
 
         elif self.current_state == KioskModeNames.TESTINGMODE:
-            await self.responce_state_is_busy()
+            await self.response_state_is_busy()
 
     async def turn_off_cooking_mode_handler(self, request):
         """Этот метод обрабатывает запрос на выключение режима готовки
@@ -172,7 +266,7 @@ class PizzaBotMain(object):
         """Этот метод обрабатывает запрос на запуск полного тестирования системы"""
         print("Получили запрос на включение режима готовки")
         if self.current_state == KioskModeNames.COOKINGMODE:
-            await self.responce_state_is_busy()
+            await self.response_state_is_busy()
 
         elif self.current_state == KioskModeNames.STANDBYMODE:
             params = {"testing_type": ServerConfig.FULL_TESTING_CODE}
@@ -180,7 +274,7 @@ class PizzaBotMain(object):
             return web.Response(text=response)
 
         elif self.current_state == KioskModeNames.TESTINGMODE:
-            await self.responce_state_is_already_on()
+            await self.response_state_is_already_on()
 
     async def start_unit_testing_handler(self, request):
         """Этот метод обрабатывает запрос на тестирование отдельного узла"""
@@ -194,7 +288,7 @@ class PizzaBotMain(object):
             response = await self.turn_any_mode(self.testing_start, params)
             return web.Response(text=response)
         else:
-            await self.responce_state_is_busy()
+            await self.response_state_is_busy()
 
     async def unit_activation_handler(self, request):
         """Этот метод обрабатывает активацию отдельного узла"""
@@ -245,7 +339,7 @@ class PizzaBotMain(object):
         (is_ok, self.equipment), recipe = await CookingMode.BeforeCooking.start_pbm(self.equipment)
         self.current_instance = CookingMode.CookingMode(recipe, self.equipment)
         if future is not None and not future.cancelled():
-            future.set_result(ServerConfig.SUCCEED_FUTURA_RESULT_CODE)
+            future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
         await self.current_instance.start()
 
     async def testing_start(self, future, *args):
@@ -266,22 +360,23 @@ class PizzaBotMain(object):
         # self.current_state = STANDBYMODE
         self.current_instance = StandByMode.StandBy()
         if future is not None and not future.cancelled():
-            future.set_result(ServerConfig.SUCCEED_FUTURA_RESULT_CODE)
+            future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
 
     async def is_open_for_new_orders(self):
-        """Метод определяет можно ли принимать заказы"""
+        """Метод определяет можно ли принимать заказы.
+        На текущий момент просто проверят, что включен 'Рабочий режим' """
         return True if self.current_state == KioskModeNames.COOKINGMODE else False
 
-    async def get_futura_result(self, futura):
+    async def get_future_result(self, future):
         """Этот метод проверяет, выполнена ли команда и формирует результат"""
-        if futura.done():
+        if future.done():
             try:
-                my_result = futura.result()
+                future_result = future.result()
             except asyncio.CancelledError:
-                my_result = "command was cancelled"
+                future_result = ServerMessages.CANCELLED_FUTURE_MESSAGE
         else:
-            my_result = "proceeding"
-        return my_result
+            future_result = ServerMessages.PENDING_FUTURE_RESULT
+        return future_result
 
     async def create_result_future(self):
         """Этот метод создает футуру на каждый запрос выполнения команды, отпарвленный на API
@@ -301,12 +396,13 @@ class PizzaBotMain(object):
         response = f"uuid:{operation_result_uuid}"
         return response
 
-    async def responce_state_is_already_on(self):
+    async def response_state_is_already_on(self):
         """Это шаблон ответа, что запрашиваемый режим уже включен"""
         print("Этот режим уже включен")
-        raise web.HTTPNotAcceptable(text="Этот режим уже включен")
+        message = ServerMessages.STATE_IS_ON_ALREADY
+        raise web.HTTPNotAcceptable(text=message)
 
-    async def responce_state_is_busy(self):
+    async def response_state_is_busy(self):
         """Это шаблон ответа, что запрашиваемый режим включить нельзя
         """
         message = f"Активирован режим {self.current_state}, включить не можем"
@@ -326,7 +422,7 @@ class PizzaBotMain(object):
             else:
                 print("Меняем данные печи")
                 self.equipment.ovens.oven_units[unit_id].status = "free"
-            return ServerConfig.SUCCEED_FUTURA_RESULT_CODE
+            return str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE)
         except KeyError:
             return "Данные не найдены"
 
@@ -436,10 +532,10 @@ class PizzaBotMain(object):
         # await asyncio.gather(controllers_bus, event_listener, is_able_to_cook_monitor,
         #                      discord_sender, message_monitoring, on_start_tasks)
 
-    def start_server(self):
-        """Это основай метод запуска работы приложения"""
-        app = self.create_server()
-        scheduler = self.create_scheduler()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.create_on_start_tasks(app, scheduler))
-        loop.run_forever()
+    # def start_server(self):
+    #     """Это основай метод запуска работы приложения"""
+    #     app = self.create_server()
+    #     scheduler = self.create_scheduler()
+    #     loop = asyncio.get_event_loop()
+    #     loop.run_until_complete(self.create_on_start_tasks(app, scheduler))
+    #     loop.run_forever()

@@ -5,14 +5,14 @@ import time
 
 from functools import partial
 
-from .base_order import BaseOrder
+from kbs.task_manager.kiosk_state.CookingMode.base_order import BaseOrder
 from kbs.exceptions import OvenReserveFailed
 from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
 from kbs.redis.recipe_data import recipe_data
 from kbs.cntrls_api.ControllerBus import Controllers
 from kbs.task_manager.kiosk_state.BaseMode import BaseMode
 from kbs.ra_api.RA import RA
-from .recipe_class import Recipy
+from kbs.task_manager.kiosk_state.CookingMode.recipe_class import Recipy
 from kbs.exceptions import OvenReservationError
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 
