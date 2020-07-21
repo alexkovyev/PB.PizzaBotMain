@@ -29,6 +29,16 @@ class Equipment(object):
         self.dough_dispensers = equipment_data["dough_dispensers"]
         self.pick_up_points = equipment_data["pick_up_points"]
 
+    async def is_able_to_cook_checker(self):
+        """Этот метод проверяет можно ли готовить, то есть работает ли мин необходмое оборудование, те
+        - станция нарезки
+        - станция упаковки
+        - хотя бы 1 из улов выдачи
+        """
+        is_cut_station_ok = self.cut_station.values()
+        is_package_station_ok = True if any(self.package_station.values()) else False
+        return True if (is_cut_station_ok and is_package_station_ok) else False
+
 
 class Oven(object):
     def __init__(self, ovens_data):
@@ -74,6 +84,9 @@ class Oven(object):
         self.oven_units[oven_id].dish = dish_id
         print("Статус печи изменен")
         return self.oven_units[oven_id]
+
+    async def broken_oven_handler(self):
+        pass
 
 
 class OvenUnit(object):

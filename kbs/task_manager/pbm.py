@@ -42,12 +42,7 @@ class PizzaBotMain(object):
         elif isinstance(self.current_instance, BeforeCooking):
             return KioskModeNames.BEFORECOOKING
 
-    async def is_open_for_new_orders(self):
-        """Метод определяет можно ли принимать заказы.
-        На текущий момент просто проверят, что включен 'Рабочий режим' """
-        return True if self.current_state == KioskModeNames.COOKINGMODE else False
-
-    async def cooking_mode_start(self, future=None, params=None):
+    async def start_cooking_mode(self, future=None, params=None):
         """Это метод непосредственно включает режим готовки
         Перед активацией режима готовки необходимо провести подготовительные процедуры:
         - обновить данные об оборудовании
@@ -66,7 +61,7 @@ class PizzaBotMain(object):
             future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
         await self.current_instance.start()
 
-    async def testing_start(self, future, params):
+    async def start_testing(self, future, params):
         """ Это супер метод тестов"""
         self.current_instance = TestingMode.TestingMode()
         testing_type, *_ = params
@@ -104,29 +99,23 @@ class PizzaBotMain(object):
                 return "Печь не опознана"
         return str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE)
 
-    async def is_able_to_cook_checker(self):
-        """Этот метод проверяет можно ли готовить, то есть работает ли мин необходмое оборудование, те
-        - станция нарезки
-        - станция упаковки
-        - хотя бы 1 из улов выдачи
-        """
-        is_cut_station_ok = self.equipment.cut_station.values()
-        is_package_station_ok = True if any(self.equipment.package_station.values()) else False
-        self.is_able_to_cook = True if (is_cut_station_ok and is_package_station_ok) else False
+    async def broken_hardware_handler(self, **kwargs):
+        await self.current_instance.broken_equipment_handler(kwargs, self.equipment)
+        self.is_able_to_cook = await self.equipment.is_able_to_cook_checker()
+        print("Можем ли готовить", self.is_able_to_cook)
 
-    # on_start_tasks
-    async def create_hardware_broke_listener(self):
-        """Этот метод запускает бесконечный таск, который отслеживает наступление событий
-         поломки оборудования"""
-        event_name = "hardware_status_changed"
-        event = self.events_monitoring.get_dispatcher_event(event_name)
-        while True:
-            event_occurrence = await event
-            _, event_params = event_occurrence
-            print("Сработало событие, обрабатываем")
-            await self.current_instance.broken_equipment_handler(event_params, self.equipment)
-            await self.is_able_to_cook_checker()
-            print("Можем ли готовить", self.is_able_to_cook)
+    async def qr_code_handler(self, **kwargs):
+        await self.current_instance.qr_code_scanned_handler(**kwargs)
+
+    async def washing_request_handler(self, **kwargs):
+        await self.current_instance.unit_washing_request(**kwargs)
+
+    async def event_handlers_binder(self):
+        """Этот метод привязывает обработчик к событию """
+        loop = asyncio.get_event_loop()
+        self.events_monitoring.bind_async(loop=loop, hardware_status_changed=self.broken_hardware_handler)
+        self.events_monitoring.bind_async(loop=loop, qr_scanned=self.qr_code_handler)
+        self.events_monitoring.bind_async(loop=loop, equipment_washing_request=self.washing_request_handler)
 
     async def get_equipment_data(self):
         """Это метод - заглушка, который имитрует подключение к БД и получение данных
@@ -172,7 +161,10 @@ class PizzaBotMain(object):
         await self.messages_for_sending.put(message)
 
     async def is_able_to_cook_monitoring(self):
-        """Это фоновая задача, отслеживающая можно ли готовитт"""
+        """Это фоновая задача, отслеживающая можно ли готовить
+        в зависмости от статуса оборудования.
+        Статус оборудования меняется при обработке поломки оборудования
+        """
         while True:
             if not self.is_able_to_cook:
                 print("Готовить не можем, выключаем систему")

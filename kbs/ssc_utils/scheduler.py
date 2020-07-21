@@ -28,7 +28,7 @@ class PbmScheduler(object):
 
         if kiosk_current_state not in IMPOSSIBLE_TO_TURN_ON_STATES:
             print("запускаем включение по планровщику")
-            await pizza_bot_main.cooking_mode_start()
+            await pizza_bot_main.start_cooking_mode()
         else:
             print("киоск занят, не могу включить")
 

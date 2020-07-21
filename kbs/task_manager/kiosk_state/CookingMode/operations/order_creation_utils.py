@@ -5,13 +5,13 @@ from ..base_order import BaseOrder
 from kbs.exceptions import OvenReserveFailed, OvenReservationError
 
 
-class CreateOrder(object):
+class OrderInitialData(object):
     """Этот класс объедняет методы для создания
     нового заказа
     """
 
     @staticmethod
-    async def get_order_content_from_db(new_order_id):
+    async def get_order_structure_from_db(new_order_id):
         """Этот метод вызывает процедуру 'Получи состав блюд в заказе' и возвращает словарь вида
         {"refid": new_order_id,
                      "dishes": {"40576654-9f31-11ea-bb37-0242ac130002":
@@ -83,7 +83,7 @@ class CreateOrder(object):
         print("Составили рецепт начинки", dish["filling"])
 
     @classmethod
-    async def get_recipe_data(cls, recipe_dict, new_order):
+    async def join_recipe_data(cls, recipe_dict, new_order):
         """Этот метод добавляет в данные о блюде параметры чейнов рецепта для конкретного ингредиента
         :param словарь блюд из заказа
         {'40576654-9f31-11ea-bb37-0242ac130002':
@@ -160,14 +160,6 @@ class CreateOrder(object):
 
     @classmethod
     async def data_preperaion_for_new_order(cls, new_order_id, recipe_data):
-        order_content = await cls.get_order_content_from_db(new_order_id)
-        await cls.get_recipe_data(recipe_data, order_content["dishes"])
+        order_content = await cls.get_order_structure_from_db(new_order_id)
+        await cls.join_recipe_data(recipe_data, order_content["dishes"])
         return order_content
-
-    @classmethod
-    async def oven_reservation(cls, order_content, equipment_data):
-        try:
-            ovens_reserved = await cls.reserve_oven(order_content, equipment_data)
-            return ovens_reserved
-        except OvenReserveFailed:
-            pass

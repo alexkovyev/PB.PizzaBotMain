@@ -69,7 +69,7 @@ async def event_generator(cntrls_events, equipment):
         """ {"equipment_type": cut_station, "uuid": o48932492834281}
         Приходят только уведомления о поломке, возобнавление работы через "оператора и перезагрузку"
         """
-        print("Сработало событие ПОЛОМКА ПЕЧИ", time.time())
+        print("Сработало событие ПОЛОМКА оборудования", time.time())
         print("Это оборудование из поломки",equipment)
         data = {
             "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
@@ -113,7 +113,7 @@ async def event_generator(cntrls_events, equipment):
         my_choice = random.randint(0, 2)
         what_happened = options[my_choice]
         await what_happened(cntrls_events, equipment)
-        n = random.randint(40, 80)
+        n = random.randint(4, 20)
         print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
         await asyncio.sleep(n)
         print("Trouble-maker снова с нами", time.time())

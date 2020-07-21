@@ -9,7 +9,7 @@ from .handler_utils import HandlersUtils
 from ..task_manager.pbm import pizza_bot_main
 
 
-class Handlers(object):
+class Handlers(HandlersUtils):
     """Это основной класс Handlers"""
 
     @classmethod
@@ -33,8 +33,8 @@ class Handlers(object):
         print(pizza_bot_main.current_state)
         return web.Response(text=pizza_bot_main.current_state, content_type='text/plain')
 
-    @staticmethod
-    async def status_command_handler(request):
+    @classmethod
+    async def status_command_handler(cls, request):
         """Этот метод обрабатывает запрос о том, выполнена ли команда, отправленная на АПИ
 
         Description end-point
@@ -69,10 +69,10 @@ class Handlers(object):
         """
 
         print("Получен запрос на статус команды")
-        params_list = await HandlersUtils.get_params_from_request(request, ["command_uuid"])
+        params_list = await cls.get_params_from_request(request, ["command_uuid"])
         command_uuid,  = params_list
         try:
-            future_result = await HandlersUtils.process_future_result(command_uuid)
+            future_result = await cls.process_future_result(command_uuid)
             return web.Response(text=future_result, content_type='text/plain')
         except KeyError:
             message = ServerMessages.UUID_COMMAND_NOT_FOUND
@@ -115,9 +115,9 @@ class Handlers(object):
           description: "Ошибка сервера"
 
         """
-        params_list = await HandlersUtils.get_params_from_request(request, ["check_code"])
+        params_list = await cls.get_params_from_request(request, ["check_code"])
         new_order_id, = params_list
-        can_receive_new_order = await pizza_bot_main.is_open_for_new_orders()
+        can_receive_new_order = await cls.is_open_for_new_orders(pizza_bot_main.current_state)
         if can_receive_new_order:
             try:
                 is_it_new_order = await pizza_bot_main.current_instance.checking_order_for_double(new_order_id)
@@ -137,8 +137,8 @@ class Handlers(object):
             message = ServerMessages.NOT_WORKING_HOURS
             raise web.HTTPNotAcceptable(text=message, content_type='text/plain')
 
-    @staticmethod
-    async def turn_on_cooking_mode_handler(request):
+    @classmethod
+    async def turn_on_cooking_mode_handler(cls, request):
         """Этот метод обрабатывает запроса на включение режима готовки
 
         Description end-point
@@ -161,17 +161,17 @@ class Handlers(object):
         current_kiosk_state = pizza_bot_main.current_state
 
         if current_kiosk_state in ALREADY_ON_STATES:
-            await HandlersUtils.response_state_is_already_on()
+            await cls.response_state_is_already_on()
 
         elif current_kiosk_state == KioskModeNames.STANDBYMODE:
-            response = await HandlersUtils.turn_any_mode(pizza_bot_main.cooking_mode_start)
+            response = await cls.turn_any_mode(pizza_bot_main.start_cooking_mode)
             return web.Response(text=response)
 
         elif current_kiosk_state == KioskModeNames.TESTINGMODE:
-            await HandlersUtils.response_state_is_busy(current_kiosk_state)
+            await cls.response_state_is_busy(current_kiosk_state)
 
-    @staticmethod
-    async def start_full_testing_handler(request):
+    @classmethod
+    async def start_full_testing_handler(cls, request):
         """Этот метод обрабатывает запрос на запуск полного тестирования системы
 
         Description end-point
@@ -192,18 +192,18 @@ class Handlers(object):
         current_kiosk_state = pizza_bot_main.current_state
 
         if current_kiosk_state == KioskModeNames.COOKINGMODE:
-            await HandlersUtils.response_state_is_busy(current_kiosk_state)
+            await cls.response_state_is_busy(current_kiosk_state)
 
         elif current_kiosk_state == KioskModeNames.STANDBYMODE:
             params = [ServerConfig.FULL_TESTING_CODE]
-            response = await HandlersUtils.turn_any_mode(pizza_bot_main.testing_start, params)
+            response = await cls.turn_any_mode(pizza_bot_main.start_testing, params)
             return web.Response(text=response, content_type='text/plain')
 
         elif current_kiosk_state == KioskModeNames.TESTINGMODE:
-            await HandlersUtils.response_state_is_already_on()
+            await cls.response_state_is_already_on()
 
-    @staticmethod
-    async def start_unit_testing_handler(request):
+    @classmethod
+    async def start_unit_testing_handler(cls, request):
         """Этот метод обрабатывает запрос на тестирование отдельного узла
         не доделано
 
@@ -241,14 +241,14 @@ class Handlers(object):
         current_kiosk_state = pizza_bot_main.current_state
         if current_kiosk_state == KioskModeNames.STANDBYMODE:
             key_list = ["testing_type", "unit_type", "unit_id"]
-            params_list = await HandlersUtils.get_params_from_request(request, key_list)
-            response = await HandlersUtils.turn_any_mode(pizza_bot_main.testing_start, params_list)
+            params_list = await cls.get_params_from_request(request, key_list)
+            response = await cls.turn_any_mode(pizza_bot_main.start_testing, params_list)
             return web.Response(text=response, content_type='application/json')
         else:
-            await HandlersUtils.response_state_is_busy(current_kiosk_state)
+            await cls.response_state_is_busy(current_kiosk_state)
 
-    @staticmethod
-    async def unit_activation_handler(request):
+    @classmethod
+    async def unit_activation_handler(cls, request):
         """Этот метод обрабатывает активацию отдельного узла
 
         Description end-point
@@ -278,6 +278,6 @@ class Handlers(object):
 
         """
         key_list = ["unit_type", "unit_id"]
-        params_list = await HandlersUtils.get_params_from_request(request, key_list)
+        params_list = await cls.get_params_from_request(request, key_list)
         message = await pizza_bot_main.unit_activation(params_list)
         return web.Response(text=message, content_type='text/plain')

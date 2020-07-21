@@ -7,6 +7,7 @@ import uuid
 import json
 
 from ..data.server.server_const import ServerMessages
+from ..data.kiosk_modes.kiosk_modes import KioskModeNames
 from ..task_manager.pbm import pizza_bot_main
 
 
@@ -136,3 +137,9 @@ class HandlersUtils(object):
         asyncio.create_task(task_name(operation_result, params))
         response = f"uuid:{operation_result_uuid}"
         return response
+
+    @staticmethod
+    async def is_open_for_new_orders(kiosk_current_state):
+        """Метод определяет можно ли принимать заказы.
+        На текущий момент просто проверят, что включен 'Рабочий режим' """
+        return True if kiosk_current_state == KioskModeNames.COOKINGMODE else False

@@ -3,7 +3,8 @@ import time
 
 from .base_order import BaseOrder
 from .cooking_mode_utils import Utils
-from .operations.order_creation_utils import CreateOrder
+from .event_handlers.broken_equipment_handler import BrokenOvenHandler
+from .operations.order_creation_utils import OrderInitialData
 from kbs.exceptions import OvenReserveFailed
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 from kbs.ra_api.RA import RA
@@ -51,7 +52,8 @@ class CookingMode(object):
         """
         return True if new_order_id not in self.current_orders_proceed else False
 
-    async def put_chains_in_queue(self, dish, queue):
+    @staticmethod
+    async def put_chains_in_queue(dish, queue):
         """Добавляет чейны рецепта в очередь в виде кортежа (dish, chain)"""
         chains = dish.chain_list
         for chain in chains:
@@ -65,9 +67,9 @@ class CookingMode(object):
 
         """
 
-        order_content = await CreateOrder.data_preperaion_for_new_order(new_order_id, self.recipes)
+        order_content = await OrderInitialData.data_preperaion_for_new_order(new_order_id, self.recipes)
         try:
-            ovens_reserved = await CreateOrder.reserve_oven(order_content, self.equipment)
+            ovens_reserved = await OrderInitialData.reserve_oven(order_content, self.equipment)
         except OvenReserveFailed:
             pass
         order = BaseOrder(order_content, ovens_reserved, self.oven_time_changes_event)
@@ -165,6 +167,24 @@ class CookingMode(object):
         if chain_to_do.__self__.status != self.STOP_STATUS:
             print("Готовим блюдо", chain_to_do.__self__.id)
             await chain_to_do(params, self)
+
+    async def broken_equipment_handler(self, event_params, equipment):
+        """Этот метод обрабатывает поломки оборудования, поступающий на event_listener
+        :param event_params: dict вида {unit_type: str, unit_id: uuid}
+        """
+        print("Обрабатываем уведомление об поломке оборудования", time.time())
+        BROKEN_STATUS = "broken"
+        unit_type = event_params["unit_type"]
+        unit_id = event_params["unit_name"]
+        try:
+            if unit_type != "ovens":
+                print("Меняем данные оборудования")
+                getattr(equipment, unit_type)[unit_id] = False
+            else:
+                print("Меняем данные печи")
+                await BrokenOvenHandler.broken_oven_handler(unit_id)
+        except KeyError:
+            print("Ошибка данных оборудования")
 
     async def start(self):
         """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""

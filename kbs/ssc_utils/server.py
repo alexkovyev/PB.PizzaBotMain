@@ -49,12 +49,12 @@ class Server():
         on_start_tasks = asyncio.create_task(pizza_bot_main.add_equipment_data())
         controllers_bus = asyncio.create_task(event_generator(pizza_bot_main.events_monitoring,
                                                               pizza_bot_main.equipment))
-        event_listener = asyncio.create_task(pizza_bot_main.create_hardware_broke_listener())
         is_able_to_cook_monitor = asyncio.create_task(pizza_bot_main.is_able_to_cook_monitoring())
+        event_binder = asyncio.create_task(pizza_bot_main.event_handlers_binder())
         # discord_sender = asyncio.create_task(self.discord_bot_client.start_working())
         message_monitoring = asyncio.create_task(pizza_bot_main.message_sending_worker())
 
-        await asyncio.gather(controllers_bus, event_listener,
+        await asyncio.gather(controllers_bus, event_binder,
                              is_able_to_cook_monitor,
                              message_monitoring,
                              on_start_tasks)
