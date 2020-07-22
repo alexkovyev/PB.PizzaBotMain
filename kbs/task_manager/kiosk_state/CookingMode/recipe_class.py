@@ -328,6 +328,7 @@ class Recipy(ConfigMixin):
         """Метод рецепта, описываюший этап возьи тесто и полей соусом"""
         print("Начинается chain Возьми ТЕСТО", time.time())
         self.status = "cooking"
+        self.oven_unit.status = "occupied"
         to_do_list = [(self.change_gripper, "None"),
                       (self.move_to_object, (self.oven_unit, None)),
                       (self.get_vane_from_oven, None),

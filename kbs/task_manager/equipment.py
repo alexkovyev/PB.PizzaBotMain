@@ -72,15 +72,18 @@ class Oven(object):
         :return list of instances OvenUnit class
         [ < api_server.equipment.OvenUnit object at 0x03C74D60 >, < api_server.equipment.OvenUnit object at0x03C74928 >]
         """
-        free_oven_list = [oven for oven in self.oven_units.values() if oven.status == oven_status]
-        return free_oven_list
+        try:
+            free_oven_list = [oven for oven in self.oven_units.values() if oven.status == oven_status]
+            return free_oven_list
+        except RecursionError:
+            return None
 
     async def select_oven_by_status(self, oven_status):
         """Этот метод получает id печи, котрая последняя в списке c нужным статусом
         :return oven_is --> str"""
         free_oven_list = await self.fetch_oven_list_by_status(oven_status="free")
         if not free_oven_list:
-            oven_can_be_cleaned = await self.select_oven_by_status("waiting_60")
+            oven_can_be_cleaned = await self.fetch_oven_list_by_status(oven_status="waiting_60")
             if oven_can_be_cleaned:
                 free_oven_list = oven_can_be_cleaned
             else:

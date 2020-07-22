@@ -3,8 +3,9 @@ import time
 
 from .base_order import BaseOrder
 from .operations.order_creation_utils import OrderInitialData
-from kbs.exceptions import OvenReserveFailed, BrokenOvenHandlerError
+from kbs.exceptions import BrokenOvenHandlerError, OvenReservationError, OvenReserveFailed
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
+from kbs.cntrls_api.ControllerBus import Controllers
 from kbs.ra_api.RA import RA
 
 
@@ -83,8 +84,9 @@ class CookingMode(object):
         order_content = await OrderInitialData.data_preperaion_for_new_order(new_order_id, self.recipes)
         try:
             ovens_reserved = await OrderInitialData.reserve_oven(order_content, self.equipment)
-        except OvenReserveFailed:
-            pass
+        except (OvenReservationError, OvenReserveFailed):
+            print("Заказ не создан")
+            return
         order = BaseOrder(order_content, ovens_reserved, self.oven_time_changes_event)
         if order:
             # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
@@ -232,9 +234,59 @@ class CookingMode(object):
             print("Ошибка данных оборудования")
 
     async def qr_code_scanned_handler(self, **kwargs):
-        print("Сработало событие сканирования qr кода в режиме неготовки")
-        print("Данные евента qr кода", kwargs)
-        pass
+        """Этот метод проверяет, есть ли заказ с таким чек кодом в current_orders_proceed.
+        Входные данные params: полученный от контроллера словарь с чек кодом заказа и окном выдачи
+        "ref_id": int, "pickup": int"""
+        print("Обрабатываем событе QR_CODE")
+        try:
+            order_check_code = kwargs["params"]["ref_id"]
+            pickup_point = kwargs["params"]["pickup"]
+        except KeyError:
+            print("Ошибка ключа, что делать?")
+            return
+        set_mode_param = await self.evaluation_status_to_set_mode(order_check_code)
+        print(set_mode_param)
+        if set_mode_param == "ready":
+            self.orders_requested_for_delivery[order_check_code] = order_check_code
+            asyncio.create_task(self.delivery_request_handler(order_check_code))
+            self.current_orders_proceed[order_check_code].pickup_point = pickup_point
+        await Controllers.set_pickup_point_mode(set_mode_param, pickup_point)
+        # не доделано
+        # await self.high_priority_queue.put(qr_code_data)
+
+    async def evaluation_status_to_set_mode(self, order_check_code):
+        """Передает контроллу значение, на основании которого пользователю
+        выводится информация о заказе на экране пункта выдачи
+        переделать на коды см в ноушн
+        если пицца не готова режим ожидания
+        """
+        CNTRLS_SET_MODE_OPTIONS = {1: "not_found",
+                                   2: "in_progress",
+                                   3: "ready"}
+        OPTIONS = {
+            "received": 2,
+            "cooking": 2,
+            "ready": 3,
+            "informed": 3,
+            "failed_to_be_cooked": 3
+        }
+        if order_check_code in self.current_orders_proceed:
+            order_status = self.current_orders_proceed[order_check_code].status
+            try:
+                set_mode = CNTRLS_SET_MODE_OPTIONS[OPTIONS[order_status]]
+            except KeyError:
+                print("статус блюда не распознан")
+                set_mode = "not_found"
+        else:
+            set_mode = "not_found"
+        return set_mode
+
+    async def delivery_request_handler(self, order_check_code):
+        """Запускает процедуру выдачи заказа
+        ДОБАВИТЬ ОЧИСТКУ поля ПЕЧЬ после упаковке --> oven_unit = None"""
+        for dish in self.current_orders_proceed[order_check_code].dishes:
+            print("Вот это блюдо выдаем", dish)
+            # не сделано
 
     async def start(self):
         """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""

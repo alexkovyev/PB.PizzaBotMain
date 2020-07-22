@@ -75,7 +75,7 @@ class BaseDish(Recipy):
                      "packed", "time_is_up"]
     STOP_STATUS = "failed_to_be_cooked"
 
-    def __init__(self, dish_id, dish_data, free_oven_id, time_changes_event, order_ref_id):
+    def __init__(self, dish_id, dish_data, free_oven_object, time_changes_event, order_ref_id):
         super().__init__()
         self.id = dish_id
         self.order_ref_id = order_ref_id
@@ -86,7 +86,7 @@ class BaseDish(Recipy):
         self.filling = BaseFilling(dish_data["filling"])
         self.additive = BaseAdditive(dish_data["additive"])
 
-        self.oven_unit = free_oven_id
+        self.oven_unit = free_oven_object
         self.status = "received"
         self.chain_list = self.create_dish_recipe()
         self.delivery_chain_list = self.create_dish_delivery_recipe()

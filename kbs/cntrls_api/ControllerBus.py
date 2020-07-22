@@ -61,8 +61,8 @@ async def event_generator(cntrls_events, equipment):
         - "check_code": str,  value: str
         - "pickup": str, value: uuid4 str
         Идентификатор оборудования должен быть единым для всех элементов системы. """
-        print("Сработало событие qr код", time.time())
-        params = {"ref_id": 65, "pickup": 1}
+        print("Сработало событие QR-CODE", time.time())
+        params = {"ref_id": 11, "pickup": 1}
         cntrls_events.qr_scanned(params)
 
     async def hardware_status_changed(cntrls_events, equipment):
@@ -70,7 +70,6 @@ async def event_generator(cntrls_events, equipment):
         Приходят только уведомления о поломке, возобнавление работы через "оператора и перезагрузку"
         """
         print("Сработало событие ПОЛОМКА оборудования", time.time())
-        print("Это оборудование из поломки",equipment)
         data = {
             "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
             "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
