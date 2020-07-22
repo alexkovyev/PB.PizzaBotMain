@@ -89,13 +89,13 @@ async def event_generator(cntrls_events, equipment):
                                "73b194e1-5926-45be-99ec-25e1021b96f7": True,
                                }
         }
-        unit_type = random.choice(["cut_station", "package_station", "sauce_dispensers"])
+        unit_type = random.choice(["ovens"])
         # unit_type = random.choice(["ovens", "cut_station", "package_station", "sauce_dispensers"])
         if unit_type != "ovens":
             unit_id = random.choice(list(data[unit_type].keys()))
         else:
             unit_id = random.choice(list(equipment.ovens.oven_units.keys()))
-        print(unit_type, unit_id)
+        print("Контроллерами выбрано поломанное оборудования", unit_type, unit_id)
         cntrls_events.hardware_status_changed(unit_type, unit_id)
 
     async def equipment_washing_request(cntrls_events, *args):
@@ -107,7 +107,6 @@ async def event_generator(cntrls_events, equipment):
     while True:
         # это эмуляция работы контроллеров по генерации разных событий
         # Используется PBM для тестирования
-        await asyncio.sleep(2)
         print("Выбираем событие", time.time())
         options = [qr_code_scanning_alarm, hardware_status_changed, equipment_washing_request]
         my_choice = random.randint(0, 2)

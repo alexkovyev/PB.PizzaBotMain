@@ -2,10 +2,8 @@ import asyncio
 import time
 
 from .base_order import BaseOrder
-from .cooking_mode_utils import Utils
-from .event_handlers.broken_equipment_handler import BrokenOvenHandler
 from .operations.order_creation_utils import OrderInitialData
-from kbs.exceptions import OvenReserveFailed
+from kbs.exceptions import OvenReserveFailed, BrokenOvenHandlerError
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 from kbs.ra_api.RA import RA
 
@@ -34,8 +32,6 @@ class CookingMode(object):
         self.main_queue = asyncio.Queue()
         self.high_priority_queue = asyncio.Queue()
         self.low_priority_queue = asyncio.Queue()
-        # wtf? что за лимит
-        self.is_limit_active = asyncio.Event()
 
     @property
     def is_downtime(self):
@@ -46,7 +42,7 @@ class CookingMode(object):
                        (self.main_queue, self.low_priority_queue, self.high_priority_queue)))
 
     async def checking_order_for_double(self, new_order_id):
-        """Этот метод проверяет есть ли уже заказ с таким ref id в обработке
+        """Этот метод проверяет есть ли уже заказ с таким check_code в обработке
         :param new_order_id: str
         :return bool
         """
@@ -58,6 +54,23 @@ class CookingMode(object):
         chains = dish.chain_list
         for chain in chains:
             await queue.put(chain)
+
+    async def get_dish_object(self, dish_id):
+        """Этот метод возращает экземпляр класса блюда по заданному ID"""
+        for order in self.current_orders_proceed.values():
+            for dish in order.dishes:
+                if dish.id == dish_id:
+                    return dish
+
+    @staticmethod
+    async def change_oven_in_dish(dish_object, new_oven_object):
+        """ Этот метод переназнаает печь в блюде
+        :param dish_object: объект блюда
+        :param new_oven_object: объект печи
+        :return: dish instance BaseDish class
+        """
+        dish_object.oven_unit = new_oven_object
+
 
     async def create_new_order(self, new_order_id):
         """Этот метод создает экземпляр класса Order и
@@ -142,7 +155,7 @@ class CookingMode(object):
         """
         for dish in dish_list:
             print("Записываем статус блюда на почти готово", dish)
-            dish_object = await Utils.get_dish_object(dish, self.current_orders_proceed)
+            dish_object = await self.get_dish_object(dish)
             print("Это номер заказа", dish_object.one_dish_order)
             if dish_object.one_dish_order:
                 print("заказ почти готов", dish_object.order_ref_id)
@@ -168,12 +181,44 @@ class CookingMode(object):
             print("Готовим блюдо", chain_to_do.__self__.id)
             await chain_to_do(params, self)
 
+    async def broken_oven_handler(self, unit_id):
+        try:
+            broken_oven_object = await self.equipment.ovens.get_oven_by_id(unit_id)
+            if broken_oven_object.status != "free":
+                print("Сломавшаяся печь со статусом", broken_oven_object.status)
+                dish_id_in_broken_oven = broken_oven_object.dish
+                dish_object_in_broken_oven = await self.get_dish_object(dish_id_in_broken_oven)
+                print("Блюдо в сломавгейя печи со статусом", dish_object_in_broken_oven.status)
+                new_oven_object = await self.equipment.ovens.oven_reserve(dish_id_in_broken_oven)
+                if broken_oven_object.status == "reserved":
+                    broken_oven_object.dish = None
+                    await self.change_oven_in_dish(dish_object_in_broken_oven, new_oven_object)
+                elif broken_oven_object.status == "occupied":
+                    if dish_object_in_broken_oven.status == "cooking":
+                        print("Запутить смену лопаток в высокий приоритет")
+                        # await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, (new_oven_object.oven_id,
+                        #                                                                   broken_oven_id)))
+                        # блюдо в печи не стирается пока не выполнится смена
+                    elif dish_object_in_broken_oven.status == "baking":
+                        print("Запустить ликвидацю блюда")
+                        # await self.low_priority_queue.put(dish_object.throwing_away_chain_list)
+                elif broken_oven_object.status == "waiting_15" or "waiting_60":
+                        # не сделано
+                        pass
+            broken_oven_object.status = "broken"
+            print("Мы обработали печь в cooking")
+            for oven in self.equipment.ovens.oven_units:
+                print(self.equipment.ovens.oven_units[oven])
+
+        except (BrokenOvenHandlerError, AttributeError):
+            pass
+
     async def broken_equipment_handler(self, event_params, equipment):
         """Этот метод обрабатывает поломки оборудования, поступающий на event_listener
         :param event_params: dict вида {unit_type: str, unit_id: uuid}
         """
         print("Обрабатываем уведомление об поломке оборудования", time.time())
-        BROKEN_STATUS = "broken"
+        print(event_params)
         unit_type = event_params["unit_type"]
         unit_id = event_params["unit_name"]
         try:
@@ -181,10 +226,15 @@ class CookingMode(object):
                 print("Меняем данные оборудования")
                 getattr(equipment, unit_type)[unit_id] = False
             else:
-                print("Меняем данные печи")
-                await BrokenOvenHandler.broken_oven_handler(unit_id)
+                print("Меняем данные печи из cooking")
+                await self.broken_oven_handler(unit_id)
         except KeyError:
             print("Ошибка данных оборудования")
+
+    async def qr_code_scanned_handler(self, **kwargs):
+        print("Сработало событие сканирования qr кода в режиме неготовки")
+        print("Данные евента qr кода", kwargs)
+        pass
 
     async def start(self):
         """Этот метод обеспечивает вызов методов по приготовлению блюд и другой важной работе"""

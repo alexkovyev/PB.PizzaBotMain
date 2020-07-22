@@ -28,12 +28,12 @@ class BaseMode(object):
 
     async def qr_code_scanned_handler(self, **kwargs):
         print("Сработало событие сканирования qr кода в режиме неготовки")
-        print(kwargs)
+        print("Данные евента qr кода", kwargs)
         pass
 
     async def unit_washing_request(self, **kwargs):
         print("Получен запрос на помывку оборудования")
-        print(kwargs)
+        print("Моем вот это", kwargs)
         pass
 
     def is_ok_to_del(self):

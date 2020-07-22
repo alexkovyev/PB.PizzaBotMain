@@ -5,7 +5,8 @@ classes used across kbs.
 
 __all__ = [
     'DataConversionWarning',
-    'BridgeError'
+    'BridgeError',
+
 ]
 
 
@@ -45,9 +46,13 @@ class NoFreeOvenError(Exception):
     pass
 
 
+# оставить 1?
 class OvenReservationError(Exception):
     pass
 
 
 class OvenReserveFailed(Exception):
+    pass
+
+class BrokenOvenHandlerError(Exception):
     pass

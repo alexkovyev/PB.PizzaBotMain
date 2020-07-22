@@ -1,6 +1,6 @@
 """Этот модуль содержит информацию об оборудовании"""
 
-from kbs.exceptions import NoFreeOvenError, OvenReservationError
+from kbs.exceptions import NoFreeOvenError, OvenReservationError, BrokenOvenHandlerError
 
 
 class Equipment(object):
@@ -42,9 +42,30 @@ class Equipment(object):
 
 class Oven(object):
     def __init__(self, ovens_data):
-        # self.oven_units = ovens_data
-        # {'e0714152-182a-4da0-9d06-5190ad44d919': <api_server.equipment.OvenUnit object at 0x03C74D60>}
         self.oven_units = {i: OvenUnit(ovens_data[i]) for i in ovens_data}
+
+    async def get_oven_by_id(self, oven_id):
+        try:
+            oven_object = self.oven_units[oven_id]
+            return oven_object
+        except KeyError:
+            raise BrokenOvenHandlerError
+
+    # async def get_oven_status(self, oven_id):
+    #     try:
+    #         oven_object = await self.get_oven_by_id(oven_id)
+    #         oven_status = oven_object.status
+    #         return oven_status
+    #     except (KeyError, AttributeError):
+    #         raise BrokenOvenHandlerError
+    #
+    # async def get_dish_in_oven(self, oven_id):
+    #     try:
+    #         oven_object = await self.get_oven_by_id(oven_id)
+    #         dish_in_oven = oven_object.dish
+    #         return dish_in_oven
+    #     except (KeyError, AttributeError):
+    #         raise BrokenOvenHandlerError
 
     async def fetch_oven_list_by_status(self, oven_status):
         """Этот метод получает список печей с необходимым статусом
@@ -85,9 +106,6 @@ class Oven(object):
         print("Статус печи изменен")
         return self.oven_units[oven_id]
 
-    async def broken_oven_handler(self):
-        pass
-
 
 class OvenUnit(object):
     def __init__(self, oven_data):
@@ -97,6 +115,9 @@ class OvenUnit(object):
         self.stop_baking_time = None
         self.dish_waiting_time = None
         self.dish_liquidation_time = None
+
+    async def get_oven_status(self):
+        return self.status
 
     def __repr__(self):
         return f"Печь № {self.oven_id} {self.status}"
