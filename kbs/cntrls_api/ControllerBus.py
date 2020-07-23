@@ -62,7 +62,7 @@ async def event_generator(cntrls_events, equipment):
         - "pickup": str, value: uuid4 str
         Идентификатор оборудования должен быть единым для всех элементов системы. """
         print("Сработало событие QR-CODE", time.time())
-        params = {"ref_id": 11, "pickup": 1}
+        params = {"check_code": 11, "pickup": 1}
         cntrls_events.qr_scanned(params)
 
     async def hardware_status_changed(cntrls_events, equipment):

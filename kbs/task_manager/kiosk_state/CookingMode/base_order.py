@@ -4,28 +4,46 @@ import time
 from .recipe_class import Recipy
 
 
-class BaseOrder(object):
-    """Этот класс представляет шаблон заказа, формируемого в среде окружения для каждого полученного заказа
+class Order(object):
+    """Этот класс содержит информцию о заказе.
+    self.check_code: str
+
+    self.dishes: list вида [экземпляр_1_класса_Dish, экземпляр_2_класса_Dish]
+
+    # переделать на константы
+    self.status: str
+
+    self.is_
+
     """
+
     ORDER_STATUS = ["received", "cooking", "ready", "packed", "wait to delivery", "delivered", "closed",
                     "failed_to_be_cooked", "not_delivered"]
 
-    def __init__(self, new_order, ovens_reserved, time_changes_event):
+    def __init__(self, new_order_content, ovens_reserved, time_changes_event):
 
-        self.ref_id = new_order["refid"]
-        self.dishes = self.dish_creation(new_order["dishes"], ovens_reserved, time_changes_event)
+        self.check_code = new_order_content["check_code"]
+        self.dishes = self.dish_creation(new_order_content["dishes"], ovens_reserved, time_changes_event)
         self.status = "received"
+        # перенести в блюдо
         self.pickup_point = None
-        self.is_order_ready_monitoring = []
+        self.dish_readiness_events = []
 
     def dish_creation(self, dishes, ovens_reserved, time_changes_event):
-        """Creates list of dishes objects in order"""
+        """Creates list of dishes objects in order
 
-        self.dishes = [BaseDish(dish_id, dishes[dish_id], ovens_reserved[index], time_changes_event, self.ref_id)
-                       for index, dish_id in enumerate(dishes)]
+        :param dishes: dict вида {dish_id: {добавить словарь}}
+        :param ovens_reserved: list вида [экземпляр_класса_OvenUnit]
+        :param time_changes_event: dict вида {"event": asyncio.Event(), "result": None}
+
+        """
+
+        self.dishes = [BaseDish(dish_id, dishes[dish_id], ovens_reserved[index], time_changes_event,
+                                self.check_code) for index, dish_id in enumerate(dishes)]
         return self.dishes
 
-    async def dish_marker(self):
+    async def order_marker(self):
+        """Этот метод маркирует заказ в зависимости от кол-ва блюд в нем """
         if len(self.dishes) > 1:
             self.dishes[-1].one_dish_order = True
         else:
@@ -34,14 +52,14 @@ class BaseOrder(object):
     async def create_is_order_ready_monitoring(self):
         """Этот метод создает мониторинг готовности блюд заказа через asyncio.Event """
         for dish in self.dishes:
-            is_dish_ready = asyncio.Event()
-            dish.is_dish_ready = is_dish_ready
-            self.is_order_ready_monitoring.append(is_dish_ready)
-        return self.is_order_ready_monitoring
+            is_dish_ready_event = asyncio.Event()
+            dish.is_dish_ready = is_dish_ready_event
+            self.dish_readiness_events.append(is_dish_ready_event)
+        return self.dish_readiness_events
 
     async def order_readiness_monitoring(self):
         """Этот метод проверяет, сработали ли события готовности блюд в заказе"""
-        while not all(list(map(lambda i: i.is_set(), self.is_order_ready_monitoring))):
+        while not all(list(map(lambda i: i.is_set(), self.dish_readiness_events))):
             await asyncio.sleep(1)
         print("Сработало событие ЗАКАЗ ГОТОВ", time.time())
         print(list(map((lambda i: i.status == "failed_to_be_cooked"), self.dishes)))
@@ -52,11 +70,11 @@ class BaseOrder(object):
             self.status = "partially_ready"
         else:
             self.status = "ready"
-        print("Это статус ЗАКАЗА",self.status)
+        print("Это статус ЗАКАЗА", self.status)
         # записать в БД статус
 
     def __repr__(self):
-        return f"Заказ № {self.ref_id}"
+        return f"Заказ № {self.check_code}"
 
 
 class BaseDish(Recipy):

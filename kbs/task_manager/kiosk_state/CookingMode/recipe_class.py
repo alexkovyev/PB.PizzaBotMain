@@ -384,6 +384,7 @@ class Recipy(ConfigMixin):
         # asyncio.create_task(self.controllers_turn_heating_on())
         await self.chain_execute(chain_list)
         print("Оставили лопатку в печи", time.time())
+        self.status = "baking"
         if self.status != "failed_to_be_cooked":
             asyncio.create_task(self.controllers_bake())
         print("ЗАКОНЧИЛИ С БЛЮДОМ", time.time())
@@ -405,13 +406,14 @@ class Recipy(ConfigMixin):
         recipe = self.baking_program
         self.status = "baking"
         operation_result = await self.controllers_oven(oven_mode, recipe)
-        while operation_result.done():
-            self.is_dish_ready.set()
-            print("БЛЮДО ГОТОВО")
-            self.status = "ready"
-            print("Это результат установки", self.is_dish_ready.is_set())
-            await self.set_oven_timer()
-        await asyncio.sleep(0)
+        print("Это результат выпечки", operation_result)
+        while not operation_result.done():
+            await asyncio.sleep()
+        self.is_dish_ready.set()
+        print("БЛЮДО ГОТОВО")
+        self.status = "ready"
+        print("Это результат установки", self.is_dish_ready.is_set())
+        await self.set_oven_timer()
 
     async def set_oven_timer(self, *args):
         print("!!!!!!!!!!ставим таймер на печь", time.time())

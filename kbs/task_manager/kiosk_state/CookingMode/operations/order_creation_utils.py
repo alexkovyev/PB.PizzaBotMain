@@ -1,7 +1,7 @@
 """Этот модуль содержит методы, используемые
 при создании нового заказа """
 
-from ..base_order import BaseOrder
+from ..base_order import Order
 from kbs.exceptions import OvenReserveFailed, OvenReservationError
 
 
@@ -11,9 +11,9 @@ class OrderInitialData(object):
     """
 
     @staticmethod
-    async def get_order_structure_from_db(new_order_id):
+    async def get_order_structure_from_db(new_order_check_code):
         """Этот метод вызывает процедуру 'Получи состав блюд в заказе' и возвращает словарь вида
-        {"refid": new_order_id,
+        {"check_code": new_order_check_code,
                      "dishes": {"40576654-9f31-11ea-bb37-0242ac130002":
                          {
                              "dough": {"id": 2},
@@ -34,7 +34,7 @@ class OrderInitialData(object):
 
         Это метод - заглушка, так как БД пока нет
         """
-        new_order = dict(refid=new_order_id, dishes={"40576654-9f31-11ea-bb37-0242ac130002":
+        new_order = dict(check_code=new_order_check_code, dishes={"40576654-9f31-11ea-bb37-0242ac130002":
             {
                 "dough": {"id": 2},
                 "sauce": {"id": 2, "content": ((1, 5), (2, 25))},
@@ -137,7 +137,7 @@ class OrderInitialData(object):
         'additive': {'id': 1, 'recipe': {1: 5}}}]}
 """
 
-        # print("Входные данные", new_order_id)
+        # print("Входные данные", new_order_check_code)
 
         for dish in new_order.values():
             dish["dough"]["recipe"] = recipe_dict["dough"]
@@ -159,7 +159,17 @@ class OrderInitialData(object):
             raise OvenReserveFailed("Ошибка назначения печей на заказ. Нет свободных печей")
 
     @classmethod
-    async def data_preperaion_for_new_order(cls, new_order_id, recipe_data):
-        order_content = await cls.get_order_structure_from_db(new_order_id)
+    async def data_preperation_for_new_order(cls, new_order_check_code, recipe_data):
+        """ Этот метод получает данные о составе заказа и получает данные, необходимые для
+        приготовления этого заказа
+
+        :param new_order_check_code: str uuid4
+        :param recipe_data:
+        :return: dict вида {"order_check_code": str,
+                            "dishes": {"dish_id": {}
+                                      }
+                            }
+        """
+        order_content = await cls.get_order_structure_from_db(new_order_check_code)
         await cls.join_recipe_data(recipe_data, order_content["dishes"])
         return order_content

@@ -27,7 +27,7 @@ class Server():
         """
         app.add_routes([
             web.get("/api/current_state", Handlers.kiosk_current_state_handler),
-            web.post("/api/new_order_id", Handlers.new_order_handler),
+            web.post("/api/new_order", Handlers.new_order_handler),
             web.post("/api/commands/cooking_mode", Handlers.turn_on_cooking_mode_handler),
             web.get("/api/commands/status", Handlers.status_command_handler),
             # web.post("/api/commands/stopping_cooking_mode",

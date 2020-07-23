@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from .base_order import BaseOrder
+from .base_order import Order
 from .operations.order_creation_utils import OrderInitialData
 from kbs.exceptions import BrokenOvenHandlerError, OvenReservationError, OvenReserveFailed
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
@@ -19,6 +19,10 @@ class CookingMode(object):
 
     self.orders_requested_for_delivery - это словарь, содержащий все заказы, по которым поучатель
                                          просканировал qr код
+
+    self.oven_time_changes_event - это словарь, содержащий событие и результат события.
+    Результат события - это словарь вида {oven_id: stop_baking_time}
+
     """
 
     STOP_STATUS = "failed_to_be_cooked"
@@ -73,25 +77,25 @@ class CookingMode(object):
         dish_object.oven_unit = new_oven_object
 
 
-    async def create_new_order(self, new_order_id):
+    async def create_new_order(self, new_order_check_code):
         """Этот метод создает экземпляр класса Order и
          заносит его в словарь self.current_orders_proceed
 
-        params: new_order_id: str, uuid нового заказа, получаемого в запросе на API
+        params: new_order_check_code: str, uuid нового заказа, получаемого в запросе на API
 
         """
 
-        order_content = await OrderInitialData.data_preperaion_for_new_order(new_order_id, self.recipes)
+        order_content = await OrderInitialData.data_preperation_for_new_order(new_order_check_code, self.recipes)
         try:
             ovens_reserved = await OrderInitialData.reserve_oven(order_content, self.equipment)
         except (OvenReservationError, OvenReserveFailed):
             print("Заказ не создан")
             return
-        order = BaseOrder(order_content, ovens_reserved, self.oven_time_changes_event)
+        order = Order(order_content, ovens_reserved, self.oven_time_changes_event)
         if order:
             # если заказ создан успешно, помещаем его в словарь всех готовящихся заказов
-            await order.dish_marker()
-            self.current_orders_proceed[order.ref_id] = order
+            await order.order_marker()
+            self.current_orders_proceed[order.check_code] = order
             for dish in order.dishes:
                 # переместить назначение пф перед запуском готовки КАК?
                 await dish.half_staff_cell_evaluation()
@@ -103,7 +107,7 @@ class CookingMode(object):
         """Этот метод обрабатывает данные об изменении времени окончания выпечки
         """
         futura_result = await self.oven_time_changes_event["result"]
-        print(futura_result)
+        print("ЭТО СРАБОТАЛА ФУТУРА", futura_result)
         for oven in futura_result:
             print(oven)
             lock = asyncio.Lock()
@@ -132,10 +136,6 @@ class CookingMode(object):
             print("Результат", self.oven_time_changes_event["result"])
             await self.stop_baking_time_setter()
             await self.clear_time_changes_monitor()
-            # lock = asyncio.Lock()
-            # async with lock:
-            #     self.oven_time_changes_event["event"].clear()
-            #     self.oven_time_changes_event["result"] = None
 
     async def select_almost_ready_dishes(self):
         dish_list = []
@@ -236,10 +236,10 @@ class CookingMode(object):
     async def qr_code_scanned_handler(self, **kwargs):
         """Этот метод проверяет, есть ли заказ с таким чек кодом в current_orders_proceed.
         Входные данные params: полученный от контроллера словарь с чек кодом заказа и окном выдачи
-        "ref_id": int, "pickup": int"""
+        "check_code": int, "pickup": int"""
         print("Обрабатываем событе QR_CODE")
         try:
-            order_check_code = kwargs["params"]["ref_id"]
+            order_check_code = kwargs["params"]["check_code"]
             pickup_point = kwargs["params"]["pickup"]
         except KeyError:
             print("Ошибка ключа, что делать?")
