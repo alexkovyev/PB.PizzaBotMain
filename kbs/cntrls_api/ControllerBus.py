@@ -111,7 +111,7 @@ async def event_generator(cntrls_events, equipment):
         my_choice = random.randint(0, 2)
         what_happened = options[my_choice]
         await what_happened(cntrls_events, equipment)
-        n = random.randint(4, 20)
+        n = random.randint(10, 20)
         print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
         await asyncio.sleep(n)
         print("Trouble-maker снова с нами", time.time())

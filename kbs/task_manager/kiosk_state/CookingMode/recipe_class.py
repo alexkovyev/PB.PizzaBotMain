@@ -408,38 +408,12 @@ class Recipy(ConfigMixin):
         operation_result = await self.controllers_oven(oven_mode, recipe)
         print("Это результат выпечки", operation_result)
         while not operation_result.done():
-            await asyncio.sleep()
+            await asyncio.sleep(0)
         self.is_dish_ready.set()
         print("БЛЮДО ГОТОВО")
         self.status = "ready"
-        print("Это результат установки", self.is_dish_ready.is_set())
-        await self.set_oven_timer()
-
-    async def set_oven_timer(self, *args):
-        print("!!!!!!!!!!ставим таймер на печь", time.time())
-        oven_future = asyncio.get_running_loop().create_future()
-        self.oven_future = oven_future
-        self.oven_unit.dish_waiting_time = time.time() + CookingModeConst.OVEN_FREE_WAITING_TIME
-        await asyncio.create_task(self.oven_timer())
-
-    async def oven_timer(self, *args):
-        """args пустые"""
-        print("!!!!!!!!!!!!Начинаем ждать первый интервал", time.time())
-        print("Статус печи", self.oven_unit.status)
         self.oven_unit.status = "waiting_15"
-        await asyncio.sleep(CookingModeConst.OVEN_FREE_WAITING_TIME)
-        print("!!!!!!!!!!! время первого сна завершено",time.time())
-        if not self.oven_future.cancelled():
-            print("!!!!!!!!!!!!!!блюдо не забрали, запускаем 60 сек")
-            self.oven_unit.status = "waiting_60"
-            self.oven_unit.dish_waiting_time = time.time() + CookingModeConst.OVEN_LIQUIDATION_TIME
-            await asyncio.sleep(CookingModeConst.OVEN_LIQUIDATION_TIME)
-            if not self.oven_future.cancelled():
-                print("!!!!!!!!!!!!!!блюдо не забрали, запускаем чистку")
-                self.oven_future.set_result("time is over")
-                self.oven_unit.status = "cleaning"
-                await args[1].high_priority_queue.put_nowait()
-                self.status = self.STOP_STATUS
+        print("Это результат установки", self.is_dish_ready.is_set())
 
     async def time_changes_handler(self, time_futura,  *args):
         """Обрабатывает результаты футуры об изменении времени выпечки"""

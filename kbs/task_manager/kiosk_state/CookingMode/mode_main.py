@@ -103,6 +103,9 @@ class CookingMode(object):
             await order.create_is_order_ready_monitoring()
             asyncio.create_task(order.order_readiness_monitoring())
 
+    async def new_order_proceeced(self):
+        pass
+
     async def stop_baking_time_setter(self):
         """Этот метод обрабатывает данные об изменении времени окончания выпечки
         """
@@ -158,7 +161,7 @@ class CookingMode(object):
         for dish in dish_list:
             print("Записываем статус блюда на почти готово", dish)
             dish_object = await self.get_dish_object(dish)
-            print("Это номер заказа", dish_object.one_dish_order)
+            print("1 блюдо в заказе?", dish_object.one_dish_order)
             if dish_object.one_dish_order:
                 print("заказ почти готов", dish_object.order_ref_id)
 
@@ -250,6 +253,7 @@ class CookingMode(object):
             self.orders_requested_for_delivery[order_check_code] = order_check_code
             asyncio.create_task(self.delivery_request_handler(order_check_code))
             self.current_orders_proceed[order_check_code].pickup_point = pickup_point
+            self.current_orders_proceed[order_check_code].delivery_request_event.set()
         await Controllers.set_pickup_point_mode(set_mode_param, pickup_point)
         # не доделано
         # await self.high_priority_queue.put(qr_code_data)
