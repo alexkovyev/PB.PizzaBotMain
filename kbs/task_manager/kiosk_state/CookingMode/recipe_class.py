@@ -34,7 +34,7 @@ class ToolsMixin(object):
         """
         try:
             for chain in chain_list:
-                if not self.dish.is_dish_failed:
+                if not self.is_dish_failed:
                     chain, params = chain
                     await chain(params, equipment)
                 else:
@@ -61,7 +61,7 @@ class ToolsMixin(object):
 
         lock = asyncio.Lock()
         async with lock:
-            self.mark_dish_as_started()
+            await self.mark_dish_as_started()
 
 
 class BaseRA(ToolsMixin):
@@ -385,6 +385,10 @@ class BaseActionsControllers():
         self.oven_unit.status = "waiting_15"
         print("Это результат установки", self.is_dish_ready.is_set())
 
+    async def turn_oven_heating_on(self, turn_on_event):
+        while turn_on_event.is_set():
+            pass
+
 
 class DishRecipe(BaseActionsRA, BaseActionsControllers):
 
@@ -425,7 +429,11 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
 
         """
         # print("Это аргс из начинки", args)
-        (filling_item, cutting_program, storage_adress), equipment = args
+        filling_data, equipment = args
+        filling_item = filling_data["id"]
+        cutting_program = filling_data["cut_program"]
+        storage_adress = filling_data["location"]
+        is_last_item = filling_data["is_last"]
 
         to_do = (
             (self.change_gripper, "product"),
@@ -435,6 +443,13 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
 
         print(f"PBM - {time.time()} Начинаем готовить {filling_item.upper()}")
 
+        if is_last_item:
+            # посчитать время на текущую операцию
+            # посчитать время на нарезку
+            # посчитать время на доставку лопатки в печь
+            # определить время включения прогрева
+            pass
+
         await self.chain_execute(to_do, equipment)
 
         if not self.is_dish_failed:
@@ -442,30 +457,39 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
             print(f"PBM {time.time()} - Запустили нарезку п-ф в очередь")
             print()
 
+    async def time_calculation(self, chain_to_do):
+        for item in chain_to_do:
+            pass
+        pass
+
     async def start_baking(self, *args):
         """Этот метод транспортрует лопатку в печь и запускает выпечку"""
         print("Начинаем чейн Вези лопатку в печь")
+        print("Это аргс из начинки", args)
+        _, equipment = args
+
         chain_list = [(self.change_gripper, "None"),
                       (self.move_to_object, (self.SLICING, None)),
                       (self.take_vane_from_cut_station, None),
                       (self.move_to_object, (self.oven_unit, None)),
                       (self.set_vane_in_oven, "heating"),
                       ]
-        print("СТАНЦИЯ НАРЕЗКИ СВОБОДНА", self.is_cut_station_free.is_set())
-        while not self.is_cut_station_free.is_set():
-            try:
-                first_task_to_do = args[1].high_priority_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                print("Доставлять нечего, поработаем в другом месте")
-            try:
-                task_to_do = args[1].low_priority_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                print("Мыть ничего не нужно, тоска")
+
+        print("СТАНЦИЯ НАРЕЗКИ СВОБОДНА", equipment.cut_station.is_free.is_set())
+        while not equipment.cut_station.is_free.is_set():
+            # try:
+            #     first_task_to_do = args[1].high_priority_queue.get_nowait()
+            # except asyncio.QueueEmpty:
+            #     print("Доставлять нечего, поработаем в другом месте")
+            # try:
+            #     task_to_do = args[1].low_priority_queue.get_nowait()
+            # except asyncio.QueueEmpty:
+            #     print("Мыть ничего не нужно, тоска")
             print("Танцеуем")
             await RA.dance()
 
         # asyncio.create_task(self.controllers_turn_heating_on())
-        await self.chain_execute(chain_list)
+        await self.chain_execute(chain_list, equipment)
         print("Оставили лопатку в печи", time.time())
         self.status = "baking"
         if self.status != "failed_to_be_cooked":

@@ -104,6 +104,9 @@ class CookingMode(object):
             await order.create_is_order_ready_monitoring()
             asyncio.create_task(order.order_readiness_monitoring())
 
+            for dish in order.dishes:
+                print(dish.filling.filling_content)
+
     async def new_order_proceeced(self):
         pass
 

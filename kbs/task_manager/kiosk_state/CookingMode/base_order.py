@@ -257,6 +257,15 @@ class BaseFilling(object):
 
         self.filling_content = [item + [value] for item, value in zip(self.filling_content, input_data)]
 
+        content_list = []
+        for item in self.filling_content:
+            my_dict = {}
+            my_dict["id"], my_dict["cut_program"], my_dict["location"] = item
+            my_dict["is_last"] = False
+            content_list.append(my_dict)
+        self.filling_content = content_list
+        self.filling_content[-1]["is_last"] = True
+
     def __repr__(self):
         return f"Начинка {self.filling_id}"
 
