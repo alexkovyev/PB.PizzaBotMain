@@ -1,4 +1,5 @@
 """Этот модуль содержит информацию об оборудовании"""
+import asyncio
 
 from kbs.exceptions import NoFreeOvenError, OvenReservationError, BrokenOvenHandlerError
 
@@ -22,8 +23,8 @@ class Equipment(object):
     OVEN_STATUSES = ["broken", "free", "reserved", "occupied", "waiting_15", "waiting_60"]
 
     def __init__(self, equipment_data):
-        self.ovens = Oven(equipment_data["ovens"])
-        self.cut_station = equipment_data["cut_station"]
+        self.ovens = Ovens(equipment_data["ovens"])
+        self.cut_station = CutStation(equipment_data["cut_station"])
         self.package_station = equipment_data["package_station"]
         self.sauce_dispensers = equipment_data["sauce_dispensers"]
         self.dough_dispensers = equipment_data["dough_dispensers"]
@@ -35,12 +36,13 @@ class Equipment(object):
         - станция упаковки
         - хотя бы 1 из улов выдачи
         """
-        is_cut_station_ok = self.cut_station.values()
+        # is_cut_station_ok = self.cut_station.values()
+        is_cut_station_ok = self.cut_station
         is_package_station_ok = True if any(self.package_station.values()) else False
         return True if (is_cut_station_ok and is_package_station_ok) else False
 
 
-class Oven(object):
+class Ovens(object):
     def __init__(self, ovens_data):
         self.oven_units = {i: OvenUnit(ovens_data[i]) for i in ovens_data}
 
@@ -124,3 +126,12 @@ class OvenUnit(object):
 
     def __repr__(self):
         return f"Печь № {self.oven_id} {self.status}"
+
+
+class CutStation(object):
+    def __init__(self, equipment_data):
+        uuid, status = equipment_data
+        self.id = uuid
+        self.is_ok = status
+        self.is_free = asyncio.Event()
+        self.be_free_at = None

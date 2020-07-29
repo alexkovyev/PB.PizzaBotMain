@@ -141,6 +141,7 @@ class Controllers(Movement):
         """
         print("Выдаем тесто из тестовой станции №", dough_point)
         result = await cls.movement(dough_point)
+        print("Контролеры закончили с тестом", time.time())
         return result
 
     @classmethod

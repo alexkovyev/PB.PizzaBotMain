@@ -69,7 +69,7 @@ class RA(Movement):
         return random.randint(1,10)
 
     @classmethod
-    async def atomic_action(cls, **kwargs):
+    async def start_atomic_action(cls, **kwargs):
         place = kwargs["place"]
         atomic_name = kwargs["name"]
         print("ra_api выполняет атомарное действие", atomic_name)

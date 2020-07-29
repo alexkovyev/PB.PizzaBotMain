@@ -30,6 +30,7 @@ class CookingMode(object):
     def __init__(self, recipes, equipment):
         self.recipes = recipes
         self.equipment = equipment
+        # self.current_orders_proceed = {}
         self.current_orders_proceed = {}
         self.orders_requested_for_delivery = {}
         self.oven_time_changes_event = {"event": asyncio.Event(), "result": None}
@@ -56,7 +57,7 @@ class CookingMode(object):
     @staticmethod
     async def put_chains_in_queue(dish, queue):
         """Добавляет чейны рецепта в очередь в виде кортежа (dish, chain)"""
-        chains = dish.chain_list
+        chains = dish.cooking_recipe
         for chain in chains:
             await queue.put(chain)
 
@@ -171,20 +172,26 @@ class CookingMode(object):
         """
         while True:
             dish_list = await self.select_almost_ready_dishes()
-            print("Это временной список для готовности блюда", dish_list)
+            # print("Это временной список для готовности блюда", dish_list)
             if dish_list:
+                print("Это временной список для готовности блюда", dish_list)
                 await self.dish_stop_baking_time_handler(dish_list)
             await asyncio.sleep(CookingModeConst.DISH_ALMOST_READY_CHECKING_GAP)
 
     async def run_chain(self, chain_to_do, params=None):
         """Этот метод распаковывает кортеж, проверяет можно ли готовить блюдо
-        (те статус блюда не STOP_STATUS) и запускает чейн с параметрами """
+        (те статус блюда не STOP_STATUS) и запускает чейн с параметрами
+        Для теста, соуса и добавки params=None
+        Для каждого элемента начинки: (method, params)
+
+        """
         print("Начинаем распаковку")
         if isinstance(chain_to_do, tuple):
             chain_to_do, params = chain_to_do
         if chain_to_do.__self__.status != self.STOP_STATUS:
             print("Готовим блюдо", chain_to_do.__self__.id)
-            await chain_to_do(params, self)
+            # print("ЭТО ПАРАМС", params)
+            await chain_to_do(params, self.equipment)
 
     async def broken_oven_handler(self, unit_id):
         try:
@@ -201,7 +208,7 @@ class CookingMode(object):
                 elif broken_oven_object.status == "occupied":
                     if dish_object_in_broken_oven.status == "cooking":
                         print("Запутить смену лопаток в высокий приоритет")
-                        # await self.high_priority_queue.put((Recipy.switch_vane_cut_oven, (new_oven_object.oven_id,
+                        # await self.high_priority_queue.put((BaseRecipy.switch_vane_cut_oven, (new_oven_object.oven_id,
                         #                                                                   broken_oven_id)))
                         # блюдо в печи не стирается пока не выполнится смена
                     elif dish_object_in_broken_oven.status == "baking":

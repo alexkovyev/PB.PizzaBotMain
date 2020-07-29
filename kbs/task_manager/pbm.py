@@ -124,7 +124,7 @@ class PizzaBotMain(object):
         oven_ids = [str(uuid.uuid4()) for i in range(1, 22)]
         equipment_data = {
             "ovens": {i: {"oven_id": i, "status": "free"} for i in oven_ids},
-            "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
+            "cut_station": ("f50ec0b7-f960-400d-91f0-c42a6d44e3d0", True),
             "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
             "sauce_dispensers": {"16ffcee8-2130-4a2f-b71d-469ee65d42d0": True,
                                  "ab5065e3-93aa-4313-869e-50a959458439": True,

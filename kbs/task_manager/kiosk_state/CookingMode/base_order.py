@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from .recipe_class import Recipy
+from .recipe_class import DishRecipe
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 
 
@@ -105,7 +105,7 @@ class Order(object):
         return f"Заказ № {self.check_code}"
 
 
-class BaseDish(Recipy):
+class BaseDish(DishRecipe):
     """Этот класс представляет собой шаблон блюда в заказе.
     Расшифровка статусов блюда:
     - received: блюдо получено, ждет в очереди
@@ -134,9 +134,9 @@ class BaseDish(Recipy):
 
         self.oven_unit = free_oven_object
         self.status = "received"
-        self.chain_list = self.create_dish_recipe()
-        self.delivery_chain_list = self.create_dish_delivery_recipe()
-        self.throwing_away_chain_list = self.throwing_dish_away()
+        self.cooking_recipe = self.create_dish_recipe()
+        # self.delivery_chain_list = self.create_dish_delivery_recipe()
+        # self.throwing_away_chain_list = self.throwing_dish_away()
         self.baking_program = dish_data["filling"]["cooking_program"]
         self.make_crust_program = dish_data["filling"]["make_crust_program"]
         self.pre_heating_program = dish_data["filling"]["pre_heating_program"]
@@ -146,10 +146,41 @@ class BaseDish(Recipy):
         self.is_dish_ready = None
         self.time_changes_event = time_changes_event
 
+    @property
+    def is_dish_failed(self):
+        return True if self.status == self.STOP_STATUS else False
+
     async def half_staff_cell_evaluation(self):
         """Этот метод назначает п\ф из БД"""
         # не сделано
         pass
+
+    def create_dish_recipe(self):
+        """Этот метод создает рецепт для блюда"""
+        print("начинаем создавать рецепт")
+        dish_recipe = [self.prepare_dough_and_sauce]
+        for filling_item in self.filling.filling_content:
+            dish_recipe.append((self.prepare_filling_item, filling_item))
+        dish_recipe.append(self.start_baking)
+        return dish_recipe
+
+    async def mark_dish_as_failed(self):
+        self.status = self.STOP_STATUS
+        self.is_dish_ready.set()
+
+    async def time_changes_handler(self, time_futura, *args):
+        """Обрабатывает результаты футуры об изменении времени выпечки"""
+        print("ОБРАБАТЫВАЕМ ФУТУРУ")
+        print(" Это ффутура из time_change_handler", self.time_changes_event)
+        lock = asyncio.Lock()
+        async with lock:
+            self.time_changes_event["result"] = time_futura
+            self.time_changes_event["event"].set()
+
+    async def mark_dish_as_started(self):
+        """ """
+        self.status = "cooking"
+        self.oven_unit.status = "occupied"
 
     def __repr__(self):
         return f"Блюдо {self.id} состоит из {self.dough}, {self.sauce}, {self.filling}, {self.additive}  " \
