@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from .recipe_class import DishRecipe
+from kbs.task_manager.kiosk_state.CookingMode.recipe.dish_recipe import DishRecipe
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 
 

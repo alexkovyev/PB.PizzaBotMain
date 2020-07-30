@@ -174,7 +174,8 @@ class Controllers(Movement):
         return result
 
     @classmethod
-    async def start_baking(cls, oven_unit, oven_mode, program, time_changes_requset, operations_result_futura):
+    async def start_baking(cls, oven_unit, oven_mode, program,
+                           time_changes_requset = None):
         """Запускает выпечку в конкртеной печи
         :param oven_unit: uuid4
                oven_mode: str
@@ -192,15 +193,13 @@ class Controllers(Movement):
          """
         print("Начинаем",oven_mode, "в", oven_unit, time.time())
         if oven_mode == "pre_heating":
-            time_changes_requset.set_result({oven_unit: (time.time() + 15)})
-            print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
-            await asyncio.sleep(10)
+            await asyncio.sleep(15)
         else:
             time_changes_requset.set_result({oven_unit: (time.time() + 60)})
             print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
             await asyncio.sleep(60)
         print("контроллеры закончили", oven_mode, time.time())
-        operations_result_futura.set_result(True)
+        return True
 
     @classmethod
     async def give_paper(cls):
