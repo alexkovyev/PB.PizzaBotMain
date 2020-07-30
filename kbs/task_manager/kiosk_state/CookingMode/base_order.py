@@ -161,7 +161,6 @@ class BaseDish(DishRecipe):
         dish_recipe = [self.prepare_dough_and_sauce]
         for filling_item in self.filling.filling_content:
             dish_recipe.append((self.prepare_filling_item, filling_item))
-        dish_recipe.append(self.start_baking)
         return dish_recipe
 
     async def mark_dish_as_failed(self):

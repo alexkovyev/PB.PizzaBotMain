@@ -38,12 +38,12 @@ sauce = {2: {"duration": 20,
 #                         }
 
 # make_crust_program \ cooking_program -> {dough_id :(heating_program_id : duration)}
-filling = {1: {"cutting_program": ({"program_id": 2, "duration": 30},
-                                   {"program_id": 1, "duration": 32},
-                                   {"program_id": 5, "duration": 35},
-                                   {"program_id": 8, "duration": 38},
-                                   {"program_id": 4, "duration": 37},
-                                   {"program_id": 9, "duration": 30}),
+filling = {1: {"cutting_program": ({"program_id": 2, "duration": 10},
+                                   {"program_id": 1, "duration": 10},
+                                   {"program_id": 5, "duration": 10},
+                                   {"program_id": 8, "duration": 10},
+                                   {"program_id": 4, "duration": 10},
+                                   {"program_id": 9, "duration": 10}),
                "pre_heating_program": {1: 1, 2: 1, 3: 1, 4: 1},
                "cooking_program": {1: (1, 180), 2: (2, 180), 3: (1, 180), 4: (1, 180)},
                "stand_by_program": {1: 2, 2: 2, 3: 2, 4: 2},

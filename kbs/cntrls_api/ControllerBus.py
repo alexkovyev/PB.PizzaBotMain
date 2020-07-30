@@ -61,7 +61,8 @@ async def event_generator(cntrls_events, equipment):
         - "check_code": str,  value: str
         - "pickup": str, value: uuid4 str
         Идентификатор оборудования должен быть единым для всех элементов системы. """
-        print("Сработало событие QR-CODE", time.time())
+        print(f"CBUS {time.time()} Сработало событие QR-CODE")
+        print()
         params = {"check_code": 11, "pickup": 1}
         cntrls_events.qr_scanned(params)
 
@@ -69,7 +70,7 @@ async def event_generator(cntrls_events, equipment):
         """ {"equipment_type": cut_station, "uuid": o48932492834281}
         Приходят только уведомления о поломке, возобнавление работы через "оператора и перезагрузку"
         """
-        print("Сработало событие ПОЛОМКА оборудования", time.time())
+        print(f"CBUS {time.time()} Сработало событие поломка оборудования")
         data = {
             "cut_station": {"f50ec0b7-f960-400d-91f0-c42a6d44e3d0": True},
             "package_station": {"afeb1c10-83ef-4194-9821-491fcf0aa52b": True},
@@ -94,27 +95,27 @@ async def event_generator(cntrls_events, equipment):
             unit_id = random.choice(list(data[unit_type].keys()))
         else:
             unit_id = random.choice(list(equipment.ovens.oven_units.keys()))
-        print("Контроллерами выбрано поломанное оборудования", unit_type, unit_id)
+        print("сломалось", unit_type, unit_id)
+        print()
         cntrls_events.hardware_status_changed(unit_type, unit_id)
 
     async def equipment_washing_request(cntrls_events, *args):
         """Информирует о том, что необходимо провести мойку такого то оборудования"""
-        print("Нужно помыть оборудование", time.time())
+        print(f"CBUS {time.time()} Нужно помыть оборудование")
         unit_name = "cut_station"
         cntrls_events.request_for_wash(unit_name)
 
     while True:
         # это эмуляция работы контроллеров по генерации разных событий
         # Используется PBM для тестирования
-        print("Выбираем событие", time.time())
         options = [qr_code_scanning_alarm, hardware_status_changed, equipment_washing_request]
         my_choice = random.randint(0, 2)
         what_happened = options[my_choice]
         await what_happened(cntrls_events, equipment)
         n = random.randint(10, 20)
-        print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
+        # print(f"Trouble-maker засыпает на {n} сек в {time.time()}")
         await asyncio.sleep(n)
-        print("Trouble-maker снова с нами", time.time())
+        # print("Trouble-maker снова с нами", time.time())
 
 
 class Movement(object):
@@ -123,11 +124,10 @@ class Movement(object):
 
     @staticmethod
     async def movement(*args):
-        n = random.randint(2, 5)
-        print("-- Время работы контроллеров", n)
+        # n = random.randint(2, 5)
+        n = 10
         await asyncio.sleep(n)
         result = random.choice([True, True])
-        print("-- Метод контроллеров завершен")
         return result
 
 
@@ -139,9 +139,11 @@ class Controllers(Movement):
         :param dough_point: uuid4 str
         :return bool
         """
-        print("Выдаем тесто из тестовой станции №", dough_point)
+        print(f"CNTRS {time.time()} Выдаем тесто из тестовой станции № {dough_point}")
+        print()
         result = await cls.movement(dough_point)
-        print("Контролеры закончили с тестом", time.time())
+        print(f"CNTRS {time.time()} Выдали тесто из тестовой станции № {dough_point}")
+        print()
         return result
 
     @classmethod
@@ -151,9 +153,11 @@ class Controllers(Movement):
         для вложенного кортежа: 0 - id насосной станции uuid str, 1 - программа поливки int
         :return bool
         """
-        print("Поливаем соусом")
-        print("Параметры из контроллеров считались", sauce_recipe)
+        print(f"CNTRS {time.time()} Поливаем соусом {sauce_recipe}")
+        print()
         result = await cls.movement()
+        print(f"CNTRS {time.time()} Закончили поливать соусом {sauce_recipe}")
+        print()
         return result
 
     @classmethod
@@ -162,8 +166,11 @@ class Controllers(Movement):
         :param cutting_program: int
         :return bool
         """
-        print("Начинаем резать продукт")
+        print(f"CNTRS {time.time()} Начинаем нарезку пф {cutting_program}")
+        print()
         result = await cls.movement()
+        print(f"CNTRS {time.time()} Закончили нарезку пф {cutting_program}")
+        print()
         return result
 
     @classmethod
@@ -185,7 +192,7 @@ class Controllers(Movement):
          """
         print("Начинаем",oven_mode, "в", oven_unit, time.time())
         if oven_mode == "pre_heating":
-            time_changes_requset.set_result({oven_unit: (time.time() + 20)})
+            time_changes_requset.set_result({oven_unit: (time.time() + 15)})
             print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
             await asyncio.sleep(10)
         else:

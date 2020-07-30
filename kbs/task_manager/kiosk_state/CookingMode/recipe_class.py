@@ -51,6 +51,8 @@ class ToolsMixin(object):
         :param time_limit:
         :return:
         """
+        print("Это лимит", limit)
+        print("Это время в лимите", time_limit)
         if limit is not None and time_limit is not None:
             time_to_dance = time_limit - time.time()
             return time_to_dance if time_to_dance >1 else False
@@ -88,8 +90,13 @@ class BaseRA(ToolsMixin):
         if possible_duration and time_limit:
             time_gap = time_limit - time.time()
             time_options = list(filter(lambda t: t <= time_gap, possible_duration))
+            print(f"Возможные варианты доезда{possible_duration}, "
+                  f"выбрано {max(time_options) if time_options else min(possible_duration)}")
+            print()
             return max(time_options) if time_options else min(possible_duration)
         elif possible_duration:
+            print(f"Возможные варианты доезда{possible_duration}, выбрано {min(possible_duration)}")
+            print()
             return min(possible_duration)
         if not possible_duration:
             raise RAError
@@ -117,7 +124,7 @@ class BaseRA(ToolsMixin):
         duration = await cls.get_atomic_chain_duration(atomic_params_dict)
         try:
             await RA.start_atomic_action(**atomic_params_dict)
-            print("Успешно выполнили атомарное действие", atomic_params_dict["name"])
+            print(f"PBM {time.time()} - Успешно выполнили атомарное действие", atomic_params_dict["name"])
         except RAError:
             print("Ошибка атомарного действия")
 
@@ -139,11 +146,15 @@ class BaseActionsRA(BaseRA, ConfigMixin):
         в зависимости от оставшегося времени. Если есть свободное, "танцуем с продуктом"
 
         """
-        print("Начинаем чейн движения")
+
         place_to, limit = move_params
         current_location = await self.get_current_position()
+
         is_limit_active = True if limit and equipment.cut_station.be_free_at else False
         time_limit = equipment.cut_station.be_free_at if is_limit_active else None
+
+        print(f"PBM {time.time()} - Начинаем чейн движения из {current_location} в {place_to}")
+        print(f"Лимит движения активирован {is_limit_active}, освободится в {time_limit}")
         # получаем все возможные временные варианты доезда до
         try:
             duration = await self.get_movement_duration(current_location,
@@ -152,7 +163,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
             await RA.position_move(place_to, duration)
             dance_time = await self.is_need_to_dance(limit, equipment.cut_station.be_free_at)
             if dance_time:
-                print("начинаем танцевать дополнительно", dance_time, time.time())
+                print(f"PBM {time.time()} начинаем танцевать дополнительно {dance_time}")
                 await RA.dance_for_time(dance_time)
         except RAError:
             print("Не найден маршрут. Что делать???")
@@ -164,7 +175,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
         :param args:
         :return:
         """
-        print("Начинаем везти продукт")
+        print(f"PBM {time.time()} - Начинаем везти продукт")
         cell_location, half_staff_position = cell_location_tuple
         atomic_params = {"name": "get_product",
                          "place": "fridge",
@@ -173,24 +184,27 @@ class BaseActionsRA(BaseRA, ConfigMixin):
                          "position": half_staff_position,
                          }
 
-        move_params_to_fridge = (cell_location, False)
+        move_params_to_fridge = (cell_location, None)
         move_params_to_cut = (self.SLICING, True)
 
-        what_to_do = [
+        what_to_do = (
             (self.move_to_object, move_params_to_fridge),
             (self.atomic_chain_execute, atomic_params),
             (self.move_to_object, move_params_to_cut),
-        ]
+        )
         await self.chain_execute(what_to_do, equipment)
-        print("*!*!*!*! Закончили с ингредиентом начинки", self.status, time.time())
+        print(f"PBM {time.time()} - Привезли ингредиент начинки в нарезку")
 
     async def change_gripper(self, required_gripper,  equipment):
         """метод, запускающий смену захвата при необходимости """
 
         current_gripper = await RA.get_current_gripper()
         is_needed_to_change_gripper = await self.is_need_to_change_gripper(current_gripper, required_gripper)
-        print("Проверяем, нужно ли менять захват", is_needed_to_change_gripper)
+
+        print(f"PBM {time.time()} - Нужно ли менять захват", is_needed_to_change_gripper)
+        print()
         if is_needed_to_change_gripper:
+            print(f"PBM {time.time()} Начинаем менять захват с {current_gripper} на {required_gripper}")
             await self.move_to_object((self.CAPTURE_STATION, None), equipment)
             while current_gripper != required_gripper:
                 # эмуляция работы)
@@ -216,9 +230,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
         oven_id = self.oven_unit
         atomic_params = {"name": "set_shovel",
                          "place": oven_id}
-        for arg in args:
-            if arg == "heating":
-                asyncio.create_task(self.controllers_turn_heating_on())
+
         await self.atomic_chain_execute(atomic_params)
 
     async def leave_vane_in_cut_station(self, *args):
@@ -242,8 +254,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
 
     async def put_half_staff_in_cut_station(self, *args):
         """Этот метод опускает п-ф в станцию нарезки"""
-        print("Начинаем размещать продукт в станции нарезки", time.time())
-        print(args)
+        print(f"PBM {time.time()} - Начинаем размещать продукт в станции нарезки")
         _, equipment = args
         print("Станция нарезки свободна", equipment.cut_station.is_free.is_set())
         atomic_params = {
@@ -251,10 +262,12 @@ class BaseActionsRA(BaseRA, ConfigMixin):
             "place": self.SLICING
         }
         while not equipment.cut_station.is_free.is_set() and not self.is_dish_failed:
-            print("Танцуем с продуктом")
+            print(f"PBM {time.time()} Станция нарезки занята, танцуем с продуктом")
+            print()
             await asyncio.sleep(1)
             # добавить вызов ra_api танец с продуктом
         await self.atomic_chain_execute(atomic_params)
+        equipment.cut_station.is_free.clear()
 
     async def dish_packaging(self):
         """Этот метод запускает группу атомарных действий по упаковке пиццы"""
@@ -288,29 +301,30 @@ class BaseActionsControllers():
 
     async def get_dough(self, *args):
         """отдает команду контролеру получить тесто"""
-        print("получаем тесто у контрллеров")
+        print(f"PBM {time.time()} Получаем тесто у контроллеров")
+        print()
         dough_point = self.dough.halfstuff_cell
         chain_result = await Controllers.give_dough(dough_point)
         if chain_result:
-            print("взяли тесто у контроллеров")
+            print(f"PBM {time.time()} успешно получили тесто у контроллеров")
         else:
             print("Ошибка получения теста у контроллеров")
             await self.mark_dish_as_failed()
         # запускает метод списать п\ф
-        print("СТАТУС блюда после получения теста", self.status)
 
     async def give_sauce(self, equipment):
         """Вызов метода контроллеров для поливания соусом"""
-        print("Начинаем поливать соусом", time.time())
+        print(f"PBM {time.time()} Начинаем поливать соусом")
+        print()
         equipment.cut_station.is_free.clear()
         recipe = self.sauce.sauce_cell
         result = await Controllers.give_sauce(recipe)
         if result:
             print("успешно полили соусом")
             equipment.cut_station.is_free.set()
+            equipment.cut_station.be_free_at = None
         else:
             await self.mark_dish_as_failed()
-        print("СТАТУС блюда после поливки соусом", self.status)
 
     async def cut_half_staff(self, cutting_program, equipment):
         print("Начинаем этап ПОРЕЖЬ продукт", time.time())
@@ -318,7 +332,7 @@ class BaseActionsControllers():
         program_id = cutting_program["program_id"]
         print("Время начала нарезки п\ф", time.time())
         equipment.cut_station.be_free_at = time.time() + cutting_program["duration"]
-        equipment.cut_station.is_free.clear()
+        print("Это время в оборудовании из контроллеров", equipment.cut_station.be_free_at)
         result = await Controllers.cut_the_product(program_id)
         if result:
             print("успешно нарезали п\ф", time.time())
@@ -360,12 +374,14 @@ class BaseActionsControllers():
         await self.time_changes_handler(time_changes)
         return operation_result
 
-    async def controllers_turn_heating_on(self):
+    async def controllers_turn_heating_on(self, time_gap):
         """Метод запускает прогрев печи"""
         print("Начинаем прогрев печи", time.time())
 
         oven_mode = "pre_heating"
         recipe = self.pre_heating_program
+
+        await asyncio.sleep(time_gap)
         operation_result = await self.controllers_oven(oven_mode, recipe)
         return operation_result
 
@@ -385,11 +401,6 @@ class BaseActionsControllers():
         self.oven_unit.status = "waiting_15"
         print("Это результат установки", self.is_dish_ready.is_set())
 
-    async def turn_oven_heating_on(self, turn_on_event):
-        while turn_on_event.is_set():
-            pass
-
-
 class DishRecipe(BaseActionsRA, BaseActionsControllers):
 
     async def prepare_dough_and_sauce(self, *args):
@@ -403,13 +414,13 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
         _, equipment = args
 
         to_do = ((self.change_gripper, "None"),
-                      (self.move_to_object, (self.oven_unit, None)),
-                      (self.get_vane_from_oven, None),
-                      (self.move_to_object, (self.SLICING, None)),
-                      (self.get_dough, None),
-                      (self.control_dough_position, None),
-                      (self.move_to_object, (self.SLICING, None)),
-                      (self.leave_vane_in_cut_station, None),
+                 (self.move_to_object, (self.oven_unit, None)),
+                 (self.get_vane_from_oven, None),
+                 (self.move_to_object, (self.SLICING, None)),
+                 (self.get_dough, None),
+                 (self.control_dough_position, None),
+                 (self.move_to_object, (self.SLICING, None)),
+                 (self.leave_vane_in_cut_station, None),
         )
 
         await self.prepare_cooking()
@@ -420,8 +431,6 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
 
         if not self.is_dish_failed:
             asyncio.create_task(self.give_sauce(equipment))
-            print(f"PBM {time.time()} - Запустили политие соусом в очередь")
-            print()
 
     async def prepare_filling_item(self, *args):
         """Чейн по доставке и нарезки 1 п\ф
@@ -441,14 +450,14 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
             (self.put_half_staff_in_cut_station, None),
                  )
 
+        await asyncio.sleep(0.2)
         print(f"PBM - {time.time()} Начинаем готовить {filling_item.upper()}")
 
         if is_last_item:
-            # посчитать время на текущую операцию
-            # посчитать время на нарезку
-            # посчитать время на доставку лопатки в печь
-            # определить время включения прогрева
-            pass
+            await asyncio.sleep(0.2)
+            time_to_do = await self.time_calculation(storage_adress, equipment, cutting_program)
+
+            time_gap_to_heating = time_to_do - 15
 
         await self.chain_execute(to_do, equipment)
 
@@ -457,10 +466,118 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
             print(f"PBM {time.time()} - Запустили нарезку п-ф в очередь")
             print()
 
-    async def time_calculation(self, chain_to_do):
-        for item in chain_to_do:
-            pass
-        pass
+            if is_last_item:
+                print(f"PBM {time.time()} - Запустили прогрев")
+                asyncio.create_task(self.controllers_turn_heating_on(time_gap_to_heating))
+                await self.change_gripper("None", equipment)
+                await self.start_baking(None, equipment)
+
+    async def time_for_change_gripper(self, current_location, current_gripper):
+
+        time_to_move = min(await RA.get_position_move_time(current_location,
+                                                    self.CAPTURE_STATION))
+        time_to_change = 0
+        if current_gripper is not None:
+            time_to_change = await self.get_atomic_chain_duration(
+                {"place": "gripper_unit", "name": "set_gripper"})
+            time_to_change += await self.get_atomic_chain_duration(
+                {"place": "gripper_unit", "name": "get_gripper"})
+        else:
+            time_to_change = await self.get_atomic_chain_duration(
+                {"place": "gripper_unit", "name": "get_gripper"})
+
+        total_time = time_to_move + time_to_change
+
+        return total_time
+
+    async def time_to_bring_half_staff(self, cell_location_tuple, current_location,
+                                       equipment, time_left):
+        cell_location, half_staff_position = cell_location_tuple
+        atomic_params = {"name": "get_product",
+                         "place": "fridge",
+                         "obj": "onion",
+                         "cell": cell_location,
+                         "position": half_staff_position,
+                         }
+
+        time_to_move_to = min(await RA.get_position_move_time(current_location, cell_location))
+        time_to_get = await RA.get_atomic_action_time(**atomic_params)
+        time_to_move_back_options = await RA.get_position_move_time(cell_location, self.SLICING)
+
+        time_limit = equipment.cut_station.be_free_at
+        time_gap = time_left + min(time_to_move_back_options)
+
+        print("Это лимит времени", time_limit)
+        print(time_gap)
+
+        if time_limit is not None:
+            if (time.time() + time_gap) > time_limit:
+                time_to_move_back = min(time_to_move_back_options)
+            else:
+                time_to_move_back = equipment.cut_station.be_free_at - time.time()
+        else:
+            time_to_move_back = min(time_to_move_back_options)
+
+        total_time = time_to_move_to + time_to_get + time_to_move_back
+
+        return total_time
+
+
+    async def time_to_bring_vane(self):
+
+        atomic_params = {"name": "get_shovel",
+                         "place": self.SLICING}
+
+        oven = self.oven_unit.oven_id
+
+        atomic_params_2 = {"name": "set_shovel",
+                         "place": oven}
+
+        time_total = await RA.get_atomic_action_time(**atomic_params)
+        print(time_total)
+
+        time_total += min(await RA.get_position_move_time(self.SLICING, oven))
+
+        print(time_total)
+
+        time_total += await RA.get_atomic_action_time(**atomic_params_2)
+
+        print(time_total)
+
+        return time_total
+
+
+    async def time_calculation(self, storage_adress, equipment, cutting_program):
+        time_left = 0
+        current_gripper = await RA.get_current_gripper()
+        current_location = await RA.get_current_position()
+        is_need_change_gripper = await self.is_need_to_change_gripper(current_gripper, "product")
+
+        if is_need_change_gripper:
+            print("ОЦЕНКА нужно менять захват")
+            time_left += await self.time_for_change_gripper(current_location,current_gripper)
+            print("Время со сменой", time_left)
+            current_location = self.CAPTURE_STATION
+
+        print("Это время освобождения станции нарезки", equipment.cut_station.be_free_at)
+
+        time_left += await self.time_to_bring_half_staff(storage_adress,
+                                                      current_location,
+                                                      equipment,
+                                                      time_left)
+
+        print("Время со смено 2", time_left)
+
+        time_left += cutting_program["duration"]
+
+        print("Время со сменой 3", time_left)
+
+        time_left += await self.time_to_bring_vane()
+
+        print("ИТОГОвое время", time_left)
+
+        return time_left
+
 
     async def start_baking(self, *args):
         """Этот метод транспортрует лопатку в печь и запускает выпечку"""
@@ -468,8 +585,7 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
         print("Это аргс из начинки", args)
         _, equipment = args
 
-        chain_list = [(self.change_gripper, "None"),
-                      (self.move_to_object, (self.SLICING, None)),
+        chain_list = [(self.move_to_object, (self.SLICING, None)),
                       (self.take_vane_from_cut_station, None),
                       (self.move_to_object, (self.oven_unit, None)),
                       (self.set_vane_in_oven, "heating"),

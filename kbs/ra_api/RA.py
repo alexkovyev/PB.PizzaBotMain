@@ -37,7 +37,7 @@ class RA(Movement):
            to_place: srt
         :return: possible_duration (list[int])
         """
-        result_choice = random.choice([[5, 6, 3, 2, 1], [4, 5, 6, 3, 1], [4, 5, 6, 3, 1]])
+        result_choice = random.choice([(5, 6, 8, 9, 7)])
         return result_choice
 
     @classmethod
@@ -49,9 +49,10 @@ class RA(Movement):
                  raiseError if not
                  # нужно определить типы ошибок
         """
-        print(f"ra_api двигается к {place} за {duration} сек", time.time())
+        print(f"RA-API {time.time()} двигается к {place} за {duration} сек")
         result = await cls.movement(duration)
-        print("ra_api доехал", time.time())
+        print(f"RA-API {time.time()} доехал к {place} за {duration} сек")
+        print()
         if result:
             return duration
         else:
@@ -65,26 +66,29 @@ class RA(Movement):
         :return: int если успешно
         :raise RAError
         """
-        print("Атомарное действие", kwargs["name"])
-        return random.randint(1,10)
+        # return random.randint(1, 10)
+        return 5
 
     @classmethod
     async def start_atomic_action(cls, **kwargs):
         place = kwargs["place"]
         atomic_name = kwargs["name"]
-        print("ra_api выполняет атомарное действие", atomic_name)
-        duration = random.randint(1, 10)
-        result = await cls.movement(duration)
+        print(f"RA-API {time.time()} выполняет атомарное действие {atomic_name}")
+        result = await cls.movement(5)
+        print(f"RA-API {time.time()} stop атомарное действие {atomic_name}")
+        print()
         return result
 
     @classmethod
     async def dance(cls):
-        print("Танцуем", time.time())
+        print(f"RA-API {time.time()} Танцуем")
+        print()
         await asyncio.sleep(1)
 
     @classmethod
     async def dance_for_time(cls, duration):
-        print("Танцуем экстра", time.time())
+        print(f"RA-API {time.time()} Танцуем экстра")
+        print()
         await asyncio.sleep(duration)
         return True
 

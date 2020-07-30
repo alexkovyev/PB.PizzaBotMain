@@ -188,11 +188,11 @@ class CookingMode(object):
         Для каждого элемента начинки: (method, params)
 
         """
-        print("Начинаем распаковку")
         if isinstance(chain_to_do, tuple):
             chain_to_do, params = chain_to_do
         if chain_to_do.__self__.status != self.STOP_STATUS:
-            print("Готовим блюдо", chain_to_do.__self__.id)
+            print(f"PBM {time.time()} - Готовим блюдо {chain_to_do.__self__.id}")
+            print()
             # print("ЭТО ПАРАМС", params)
             await chain_to_do(params, self.equipment)
 
@@ -200,10 +200,10 @@ class CookingMode(object):
         try:
             broken_oven_object = await self.equipment.ovens.get_oven_by_id(unit_id)
             if broken_oven_object.status != "free":
-                print("Сломавшаяся печь со статусом", broken_oven_object.status)
+                print(f"PBM {time.time()} - Сломавшаяся печь со статусом {broken_oven_object.status}")
                 dish_id_in_broken_oven = broken_oven_object.dish
                 dish_object_in_broken_oven = await self.get_dish_object(dish_id_in_broken_oven)
-                print("Блюдо в сломавгейя печи со статусом", dish_object_in_broken_oven.status)
+                print(f"PBM {time.time()} - Сломавшаяся печь со статусом {dish_object_in_broken_oven.status}")
                 new_oven_object = await self.equipment.ovens.oven_reserve(dish_id_in_broken_oven)
                 if broken_oven_object.status == "reserved":
                     broken_oven_object.dish = None
@@ -221,7 +221,6 @@ class CookingMode(object):
                         # не сделано
                         pass
             broken_oven_object.status = "broken"
-            print("Мы обработали печь в cooking")
             for oven in self.equipment.ovens.oven_units:
                 print(self.equipment.ovens.oven_units[oven])
 
@@ -232,16 +231,14 @@ class CookingMode(object):
         """Этот метод обрабатывает поломки оборудования, поступающий на event_listener
         :param event_params: dict вида {unit_type: str, unit_id: uuid}
         """
-        print("Обрабатываем уведомление об поломке оборудования", time.time())
+        print(f"PBM {time.time()} Обрабатываем уведомление об поломке оборудования")
         print(event_params)
         unit_type = event_params["unit_type"]
         unit_id = event_params["unit_name"]
         try:
             if unit_type != "ovens":
-                print("Меняем данные оборудования")
                 getattr(equipment, unit_type)[unit_id] = False
             else:
-                print("Меняем данные печи из cooking")
                 await self.broken_oven_handler(unit_id)
         except KeyError:
             print("Ошибка данных оборудования")
@@ -250,7 +247,8 @@ class CookingMode(object):
         """Этот метод проверяет, есть ли заказ с таким чек кодом в current_orders_proceed.
         Входные данные params: полученный от контроллера словарь с чек кодом заказа и окном выдачи
         "check_code": int, "pickup": int"""
-        print("Обрабатываем событе QR_CODE")
+        print(f"PBM {time.time()} Обрабатываем событе QR_CODE")
+        print()
         try:
             order_check_code = kwargs["params"]["check_code"]
             pickup_point = kwargs["params"]["pickup"]
@@ -309,16 +307,16 @@ class CookingMode(object):
         asyncio.create_task(self.dish_inform_monitor())
 
         while True:
-            print("Работает cooking", time.time())
             if self.is_downtime:
-                print("Танцуем, других заданий нет")
+                print(f"PBM {time.time()} - Танцуем, других заданий нет")
+                print()
                 await RA.dance()
             else:
                 if not self.high_priority_queue.empty():
-                    print("Выдаем заказ")
+                    print(f"PBM {time.time()} - Выдаем заказа")
+                    print()
                     await self.high_priority_queue.get()
                 elif not self.main_queue.empty():
-                    print("Вернулись в очередь main")
                     chain_to_do = await self.main_queue.get()
                     await self.run_chain(chain_to_do)
                 elif not self.low_priority_queue.empty():
