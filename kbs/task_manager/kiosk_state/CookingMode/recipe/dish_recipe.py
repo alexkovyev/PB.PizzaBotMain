@@ -64,10 +64,13 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
         print(f"PBM - {time.time()} Начинаем готовить {filling_item.upper()}")
 
         if is_last_item:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)
             time_to_do = await self.time_calculation(storage_adress, equipment, cutting_program)
 
             time_gap_to_heating = time_to_do - 15
+
+            print(f"PBM {time.time()} - Запустили прогрев")
+            heating_task = asyncio.create_task(self.controllers_turn_heating_on(time_gap_to_heating))
 
         await self.chain_execute(to_do, equipment)
 
@@ -77,8 +80,6 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
             print()
 
             if is_last_item:
-                print(f"PBM {time.time()} - Запустили прогрев")
-                heating_task = asyncio.create_task(self.controllers_turn_heating_on(time_gap_to_heating))
                 await self.change_gripper("None", equipment)
 
                 while heating_task.done():
@@ -121,7 +122,7 @@ class DishRecipe(BaseActionsRA, BaseActionsControllers):
         time_to_move_back_options = await RA.get_position_move_time(cell_location, self.SLICING)
 
         time_limit = equipment.cut_station.be_free_at
-        time_gap = time_left + min(time_to_move_back_options)
+        time_gap = time_left + min(time_to_move_back_options) + time_to_move_to + time_to_get
 
         print("Это лимит времени по станции нарезки", time_limit)
         print("Это время до плюс минимальное обратно", time_gap)

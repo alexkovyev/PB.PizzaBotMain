@@ -99,6 +99,7 @@ class RA(Movement):
 
     @classmethod
     async def get_current_gripper(cls):
-        gripper_options = ["product", None]
+        # gripper_options = ["product", None]
+        gripper_options = [None]
         return random.choice(gripper_options)
 

@@ -46,8 +46,6 @@ class ToolsMixin(object):
         :param time_limit:
         :return:
         """
-        print("Это лимит", limit)
-        print("Это время в лимите", time_limit)
         if limit is not None and time_limit is not None:
             time_to_dance = time_limit - time.time()
             return time_to_dance if time_to_dance >1 else False
