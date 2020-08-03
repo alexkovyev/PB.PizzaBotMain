@@ -1,10 +1,9 @@
 import time
 
-from .RAactions import BaseActionsRA
 from kbs.ra_api.RA import RA
 
 
-class DurationEvaluation(BaseActionsRA):
+class DurationEvaluation(RA):
 
     async def time_for_change_gripper(self, current_location, current_gripper):
 
@@ -36,7 +35,6 @@ class DurationEvaluation(BaseActionsRA):
 
         print("Считаем время привоза п-ф")
         time_to_move_to = min(await RA.get_position_move_time(current_location, cell_location))
-        print("Это время поездки до холодилника", time_to_move_to)
         time_to_get = await RA.get_atomic_action_time(**atomic_params)
         print("Это время атомарного действия", time_to_get)
         time_to_move_back_options = await RA.get_position_move_time(cell_location, self.SLICING)
@@ -44,20 +42,34 @@ class DurationEvaluation(BaseActionsRA):
         time_limit = equipment.cut_station.be_free_at
         time_gap = time_left + min(time_to_move_back_options) + time_to_move_to + time_to_get
 
+        print("Время на смену захвата", time_left)
+        print("Время доезда до холодильника", time_to_move_to)
+        print("Это время атомарного действия", time_to_get)
         print("Это лимит времени по станции нарезки", time_limit)
-        print("Это время до плюс минимальное обратно", time_gap)
+        print("Это time gap на весь чейн", time_gap)
+        print(time.time())
+        print("Чейн закончится в ", (time.time() + time_gap))
 
         if time_limit is not None:
             if (time.time() + time_gap) > time_limit:
                 time_to_move_back = min(time_to_move_back_options)
-                print("Время если с лимитом и минимальным значением", time_to_move_back)
+                print("Время обратно если с лимитом и минимальным значением", time_to_move_back)
             else:
                 time_to_move_back = equipment.cut_station.be_free_at - time.time()
                 print("Время без лимита как разница", time_to_move_back)
         else:
             time_to_move_back = min(time_to_move_back_options)
 
-        total_time = time_to_move_to + time_to_get + time_to_move_back
+        atomic_params = {
+            "name": "set_product",
+            "place": self.SLICING
+        }
+
+        time_to_put_item = await RA.get_atomic_action_time(**atomic_params)
+
+        total_time = time_to_move_to + time_to_get + time_to_move_back + time_to_put_item
+
+        print("Это возвращает функция пф", total_time)
 
         return total_time
 
@@ -72,7 +84,9 @@ class DurationEvaluation(BaseActionsRA):
         atomic_params_2 = {"name": "set_shovel",
                          "place": oven}
 
-        time_total = await RA.get_atomic_action_time(**atomic_params)
+        time_total = min(await RA.get_position_move_time(oven, self.SLICING))
+
+        time_total += await RA.get_atomic_action_time(**atomic_params)
         print(time_total)
 
         time_total += min(await RA.get_position_move_time(self.SLICING, oven))
@@ -90,7 +104,7 @@ class DurationEvaluation(BaseActionsRA):
         time_left = 0
         current_gripper = await RA.get_current_gripper()
         current_location = await RA.get_current_position()
-        is_need_change_gripper = await self.is_need_to_change_gripper(current_gripper, "None")
+        is_need_change_gripper = await self.is_need_to_change_gripper(current_gripper, "product")
 
         if is_need_change_gripper:
             print("ОЦЕНКА нужно менять захват")

@@ -31,7 +31,7 @@ class BaseRA(ToolsMixin):
         if possible_duration and time_limit:
             time_gap = time_limit - time.time()
             time_options = list(filter(lambda t: t <= time_gap, possible_duration))
-            print(f"Возможные варианты доезда{possible_duration}, "
+            print(f"Возможные варианты доезда при активном лимите {possible_duration}, "
                   f"выбрано {max(time_options) if time_options else min(possible_duration)}")
             print()
             return max(time_options) if time_options else min(possible_duration)

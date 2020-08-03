@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+from .utils import DurationEvaluation
 from kbs.ra_api.RA import RAError
 
 
@@ -15,7 +16,7 @@ class ConfigMixin(object):
     STOP_STATUS = "failed_to_be_cooked"
 
 
-class ToolsMixin(object):
+class ToolsMixin(DurationEvaluation):
 
     @staticmethod
     async def is_need_to_change_gripper(current_gripper: str, required_gripper: str):
