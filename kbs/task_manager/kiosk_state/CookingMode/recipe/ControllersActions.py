@@ -63,7 +63,7 @@ class BaseActionsControllers():
             # расписать какая ошибка: - замятие бумаги или полная поломка
             # если замятие, добавить вызов ra_api на уборку бумаги
 
-    async def controllers_turn_heating_on(self, time_gap):
+    async def controllers_turn_heating_on(self, time_gap, is_ready_for_baking):
         """Метод запускает прогрев печи"""
         print("Начинаем ждать запуск прогрева печи", time.time())
 
@@ -76,6 +76,7 @@ class BaseActionsControllers():
         print("Закончили прогрев печи", time.time())
 
         if operation_result:
+            await is_ready_for_baking.wait()
             await self.controllers_bake()
 
     async def controllers_bake(self, *args):

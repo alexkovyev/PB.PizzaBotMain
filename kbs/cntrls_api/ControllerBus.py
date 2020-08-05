@@ -211,7 +211,22 @@ class Controllers(Movement):
         return result
 
     @classmethod
-    async def set_pickup_point_mode(cls, mode, pick_up_point):
+    async def set_not_found(cls, pick_up_point):
+        """Метод выставляет режим работы пункта выдачи"""
+        return True
+
+    @classmethod
+    async def set_in_progress(cls, pick_up_point):
+        """Метод выставляет режим работы пункта выдачи"""
+        return True
+
+    @classmethod
+    async def set_time_is_up(cls, pick_up_point):
+        """Метод выставляет режим работы пункта выдачи"""
+        return True
+
+    @classmethod
+    async def set_is_ready(cls, pick_up_point):
         """Метод выставляет режим работы пункта выдачи"""
         return True
 

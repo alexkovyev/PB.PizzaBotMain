@@ -81,6 +81,8 @@ class DurationEvaluation(RA):
 
         oven = self.oven_unit.oven_id
 
+        print("Это объект печь", oven)
+
         atomic_params_2 = {"name": "set_shovel",
                          "place": oven}
 

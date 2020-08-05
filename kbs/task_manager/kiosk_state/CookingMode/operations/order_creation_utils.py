@@ -1,7 +1,7 @@
 """Этот модуль содержит методы, используемые
 при создании нового заказа """
 
-from ..base_order import Order
+from ..order import Order
 from kbs.exceptions import OvenReserveFailed, OvenReservationError
 
 

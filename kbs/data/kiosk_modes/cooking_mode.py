@@ -4,3 +4,7 @@ class CookingModeConst(object):
     OVEN_LIQUIDATION_TIME = 60
     OVEN_FREE_WAITING_TIME = 35
     HALF_STAFF_CHECK_TIME = 60
+
+
+class Status(object):
+    STOP_STATUS = "failed_to_be_cooked"

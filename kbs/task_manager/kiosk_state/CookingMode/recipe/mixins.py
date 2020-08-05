@@ -52,9 +52,3 @@ class ToolsMixin(DurationEvaluation):
             return time_to_dance if time_to_dance >1 else False
         else:
             return False
-
-    async def prepare_cooking(self):
-
-        lock = asyncio.Lock()
-        async with lock:
-            await self.mark_dish_as_started()
