@@ -2,38 +2,45 @@ import asyncio
 import time
 
 from kbs.cntrls_api.ControllerBus import Controllers
+from kbs.exceptions import ControllersFailedError
 
 
 class BaseActionsControllers():
 
-    async def get_dough(self, *args):
+    @staticmethod
+    async def get_dough(dough_point, *args):
         """отдает команду контролеру получить тесто"""
         print(f"PBM {time.time()} Получаем тесто у контроллеров")
         print()
-        dough_point = self.dough.halfstuff_cell
-        chain_result = await Controllers.give_dough(dough_point)
-        if chain_result:
+
+        operation_result = await Controllers.give_dough(dough_point)
+
+        if operation_result:
             print(f"PBM {time.time()} успешно получили тесто у контроллеров")
         else:
-            print("Ошибка получения теста у контроллеров")
-            await self.mark_dish_as_failed()
-        # запускает метод списать п\ф
+            print(f"PBM {time.time()}Ошибка получения теста у контроллеров")
+            raise ControllersFailedError
+        # запускает метод списать п\ф через Mixin
 
-    async def give_sauce(self, equipment):
-        """Вызов метода контроллеров для поливания соусом"""
+    @staticmethod
+    async def give_sauce(equipment, sauce_recipe):
+        """Вызов метода контроллеров для поливания соусом
+        или добавкой """
         print(f"PBM {time.time()} Начинаем поливать соусом")
         print()
-        equipment.cut_station.is_free.clear()
-        recipe = self.sauce.sauce_cell
-        result = await Controllers.give_sauce(recipe)
-        if result:
-            print("успешно полили соусом")
-            equipment.cut_station.is_free.set()
-            equipment.cut_station.be_free_at = None
-        else:
-            await self.mark_dish_as_failed()
 
-    async def cut_half_staff(self, cutting_program, equipment):
+        await equipment.cut_station.set_occupied()
+        operation_result = await Controllers.give_sauce(sauce_recipe)
+
+        if operation_result:
+            print(f"PBM {time.time()} успешно полили соусом")
+            await equipment.cut_station.set_free()
+        else:
+            print(f"PBM {time.time()}Ошибка контроллеров при поливании соусом")
+            raise ControllersFailedError
+        # запускает метод списать п\ф через Mixin
+
+    async def cut_half_staff(self, cutting_program, equipment, is_last_item=False):
         print("Начинаем этап ПОРЕЖЬ продукт", time.time())
         duration = cutting_program["duration"]
         program_id = cutting_program["program_id"]
@@ -46,6 +53,8 @@ class BaseActionsControllers():
             equipment.cut_station.is_free.set()
             equipment.cut_station.be_free_at = None
             print("СНЯТ временой ЛИМИТ в", time.time())
+            if is_last_item:
+                await Controllers.give_sauce()
         else:
             print("---!!! Не успешно нарезали п\ф")
             await self.mark_dish_as_failed()

@@ -4,7 +4,9 @@ import asyncio
 import time
 
 from .recipe.dish_recipe import DishRecipe
-from kbs.ra_api.RA import RA
+from kbs.ra_api.RA import RA, RAError
+from kbs.data.kiosk_modes.cooking_mode import Status
+from kbs.exceptions import ControllersFailedError
 
 
 class DishStatus(object):
@@ -23,8 +25,6 @@ class DishStatus(object):
     DISH_STATUSES = ["received", "cooking", "baking", "failed_to_be_cooked", "ready",
                      "packed", "time_is_up"]
 
-    STOP_STATUS = "failed_to_be_cooked"
-
     def __init__(self, time_changes_event):
         self.status = "received"
         self.is_dish_ready = None
@@ -34,20 +34,12 @@ class DishStatus(object):
     def is_dish_failed(self):
         """Этот метод проверяет можно ли готовить блюдо дальше, то есть
          его статус не STOP_STATUS """
-        return True if self.status == self.STOP_STATUS else False
-
-    async def mark_dish_as_started_cooking(self):
-        """ Этот метод помечяет, что начата готовка блюда """
-
-        lock = asyncio.Lock()
-        async with lock:
-            self.status = "cooking"
-            # self.oven_unit.status = "occupied"
+        return True if self.status == Status.STOP_STATUS else False
 
     async def mark_dish_as_failed(self):
         """Этот метод помечает блюдо как законченное для готовки, но неудачно"""
 
-        self.status = self.STOP_STATUS
+        self.status = Status.STOP_STATUS
         self.is_dish_ready.set()
 
     async def time_changes_handler(self, time_future):
@@ -91,6 +83,14 @@ class Dish(DishStatus, DishRecipe):
         # не сделано
         pass
 
+    async def mark_dish_as_started_cooking(self):
+        """ Этот метод помечяет, что начата готовка блюда """
+
+        lock = asyncio.Lock()
+        async with lock:
+            self.status = "cooking"
+            self.oven_unit.status = "occupied"
+
     async def prepare_dough_and_sauce(self, *args):
         """Метод рецепта, описываюший этап возьи тесто и полей соусом
         Это bound-method к блюду, поэтому доступны все атрибуты
@@ -101,11 +101,15 @@ class Dish(DishStatus, DishRecipe):
 
         _, equipment = args
 
+        dough_point = self.dough.halfstuff_cell
+        sauce_recipe = self.sauce.sauce_cell
+        oven_unit = self.oven_unit.id
+
         to_do = ((self.change_gripper, "None"),
                  (self.move_to_object, (self.oven_unit, None)),
-                 (self.get_vane_from_oven, None),
+                 (self.get_vane_from_oven, oven_unit),
                  (self.move_to_object, (self.SLICING, None)),
-                 (self.get_dough, None),
+                 (self.get_dough, dough_point),
                  (self.control_dough_position, None),
                  (self.move_to_object, (self.SLICING, None)),
                  (self.leave_vane_in_cut_station, None),
@@ -118,7 +122,7 @@ class Dish(DishStatus, DishRecipe):
         print()
 
         if not self.is_dish_failed:
-            asyncio.create_task(self.give_sauce(equipment))
+            asyncio.create_task(self.give_sauce(sauce_recipe, equipment))
 
     async def prepare_filling_item(self, *args):
         """Чейн по доставке и нарезки 1 п-ф
@@ -160,7 +164,9 @@ class Dish(DishStatus, DishRecipe):
         await self.chain_execute(to_do, equipment)
 
         if not self.is_dish_failed:
-            asyncio.create_task(self.cut_half_staff(cutting_program, equipment))
+            asyncio.create_task(self.cut_half_staff(cutting_program,
+                                                    equipment,
+                                                    is_last_item))
             print(f"PBM {time.time()} - Запустили нарезку п-ф в очередь")
             print()
 
@@ -198,6 +204,21 @@ class Dish(DishStatus, DishRecipe):
             dish_recipe.append((self.prepare_filling_item, filling_item))
         return dish_recipe
 
+    async def chain_execute(self, chain_list, equipment):
+        """Метод, вызывающий выполнение чейнов из списка
+        Чейн - это какая то непрерывная последовательность действий.
+        """
+        try:
+            for chain in chain_list:
+                if not self.is_dish_failed:
+                    chain, params = chain
+                    await chain(params, equipment)
+                else:
+                    break
+        except (RAError, ControllersFailedError):
+            print("Ошибка века")
+            await self.mark_dish_as_failed()
+
     def __repr__(self):
         return f"Блюдо {self.id} состоит из {self.dough}, {self.sauce}, {self.filling}, {self.additive}  " \
                f"\"Зарезервирована печь\" {self.oven_unit} Статус {self.status}"
@@ -217,7 +238,6 @@ class BaseDough(BasePizzaPart):
 
     def __init__(self, dough_data):
         self.halfstuff_id = dough_data["id"]
-        # self.halfstuff_cell хранит только место ячейки, при инициации None
         self.halfstuff_cell = 21
         self.recipe_data = dough_data["recipe"]
 
@@ -231,9 +251,10 @@ class BaseSauce(BasePizzaPart):
     def __init__(self, sauce_data):
         self.sauce_id = sauce_data["id"]
         self.sauce_content = sauce_data["content"]
+        self.sauce_recipe = sauce_data["recipe"]
         # sauce_cell=[(1, 1), (2, 2)] 0 - id насосной станции, 1 - программа запуска
         self.sauce_cell = self.unpack_data(sauce_data)
-        self.sauce_recipe = sauce_data["recipe"]
+
 
     def unpack_data(self, sauce_data):
         """выводт данные в виде [(cell_id, program_id), (None, 3)]"""

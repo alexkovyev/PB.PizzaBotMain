@@ -1,5 +1,6 @@
 """Этот модуль содержит информацию об оборудовании"""
 import asyncio
+import time
 
 from kbs.exceptions import NoFreeOvenError, OvenReservationError, BrokenOvenHandlerError
 
@@ -134,4 +135,21 @@ class CutStation(object):
         self.id = uuid
         self.is_ok = status
         self.is_free = asyncio.Event()
+        self.be_free_at = None
+
+    async def set_occupied(self, unix_time=time.time()):
+        """
+        Этот метод помечает, что станция нарезки занята и освободится
+        в секундах с момента epoch.
+        :param unix_time: float. The time in seconds since the epoch
+        as a floating point number.
+        """
+        self.is_free.clear()
+        self.be_free_at = unix_time
+
+    async def set_free(self):
+        """ Этот метод уведомляет всех желающих о том,
+        что станция нарезки свободная
+        """
+        self.is_free.set()
         self.be_free_at = None

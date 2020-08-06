@@ -2,7 +2,6 @@ import asyncio
 import time
 
 from .dish import Dish
-from kbs.task_manager.kiosk_state.CookingMode.recipe.dish_recipe import DishRecipe
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst
 
 
@@ -15,7 +14,6 @@ class Order(object):
     # переделать на константы
     self.status: str
 
-    self.is_
 
     """
 
@@ -41,8 +39,8 @@ class Order(object):
 
         """
 
-        self.dishes = [Dish(time_changes_event, dish_id, dishes[dish_id], ovens_reserved[index],
-                                self.check_code) for index, dish_id in enumerate(dishes)]
+        self.dishes = [Dish(time_changes_event, dish_id, dishes[dish_id], self.check_code,
+                            ovens_reserved[index]) for index, dish_id in enumerate(dishes)]
         return self.dishes
 
     async def order_marker(self):
@@ -66,7 +64,7 @@ class Order(object):
             print("Закончили ждать 1 интервал", time.time())
             for dish in self.dishes:
                 dish.oven_unit.status = "waiting_60"
-            stop_time = time.time() + CookingModeConst.OVEN_FREE_WAITING_TIME*2
+            stop_time = time.time() + CookingModeConst.OVEN_FREE_WAITING_TIME * 2
             while not self.delivery_request_event.is_set() and time.time() < stop_time:
                 print("Ждем 2 интервал")
                 await asyncio.sleep(1)

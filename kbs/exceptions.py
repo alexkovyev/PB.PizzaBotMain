@@ -56,3 +56,6 @@ class OvenReserveFailed(Exception):
 
 class BrokenOvenHandlerError(Exception):
     pass
+
+class ControllersFailedError(Exception):
+    pass

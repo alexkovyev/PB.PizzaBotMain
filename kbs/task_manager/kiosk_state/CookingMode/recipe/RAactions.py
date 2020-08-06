@@ -110,13 +110,17 @@ class BaseActionsRA(BaseRA, ConfigMixin):
             print("Не найден маршрут. Что делать???")
 
     async def bring_half_staff(self, cell_location_tuple, equipment, *args):
-        """
+        """ Этот метод запускет доставку компонента из холодильника
+        в станцию нарезки
 
         :param cell_location_tuple: ('d4', (3, 4))
+        :param equipment:
         :param args:
         :return:
         """
         print(f"PBM {time.time()} - Начинаем везти продукт")
+
+        # параметры запуска
         cell_location, half_staff_position = cell_location_tuple
         atomic_params = {"name": "get_product",
                          "place": "fridge",
@@ -133,6 +137,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
             (self.atomic_chain_execute, atomic_params),
             (self.move_to_object, move_params_to_cut),
         )
+
         await self.chain_execute(what_to_do, equipment)
         print(f"PBM {time.time()} - Привезли ингредиент начинки в нарезку")
 
@@ -144,6 +149,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
 
         print(f"PBM {time.time()} - Нужно ли менять захват", is_needed_to_change_gripper)
         print()
+
         if is_needed_to_change_gripper:
             print(f"PBM {time.time()} Начинаем менять захват с {current_gripper} на {required_gripper}")
             await self.move_to_object((self.CAPTURE_STATION, None), equipment)
@@ -159,11 +165,11 @@ class BaseActionsRA(BaseRA, ConfigMixin):
                     # Потом удалить, эмуляция работы
                     current_gripper = required_gripper
 
-    async def get_vane_from_oven(self, *args):
+    async def get_vane_from_oven(self, oven_unit, *args):
         """Этот метод запускает группу атомарных действий ra_api по захвату лопатки из печи"""
-        oven = self.oven_unit
+
         atomic_params = {"name": "get_vane_from_oven",
-                         "place": oven}
+                         "place": oven_unit}
         await self.atomic_chain_execute(atomic_params)
 
     async def set_vane_in_oven(self, *args):
@@ -196,18 +202,24 @@ class BaseActionsRA(BaseRA, ConfigMixin):
     async def put_half_staff_in_cut_station(self, *args):
         """Этот метод опускает п-ф в станцию нарезки"""
         print(f"PBM {time.time()} - Начинаем размещать продукт в станции нарезки")
+
         _, equipment = args
+
         print("Станция нарезки свободна", equipment.cut_station.is_free.is_set())
+
         atomic_params = {
             "name": "set_product",
             "place": self.SLICING
         }
+
         while not equipment.cut_station.is_free.is_set() and not self.is_dish_failed:
             print(f"PBM {time.time()} Станция нарезки занята, танцуем с продуктом")
             print()
             await asyncio.sleep(1)
             # добавить вызов ra_api танец с продуктом
+
         await self.atomic_chain_execute(atomic_params)
+
         equipment.cut_station.is_free.clear()
 
     async def dish_packaging(self):

@@ -180,5 +180,4 @@ class PizzaBotMain(object):
                 await self.discord_bot_client.send_messages(message_to_send)
             await asyncio.sleep(1)
 
-
 pizza_bot_main = PizzaBotMain()

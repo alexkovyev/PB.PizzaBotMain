@@ -1,7 +1,7 @@
 """Этот модуль содержит методы, используемые
 при создании нового заказа """
 
-from ..order import Order
+from kbs.task_manager.kiosk_state.CookingMode.order import Order
 from kbs.exceptions import OvenReserveFailed, OvenReservationError
 
 
