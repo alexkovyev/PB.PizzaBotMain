@@ -67,9 +67,11 @@ class QRCodeHandler(object):
     Это описание
     """
     async def not_found(self, pickup_point):
+        print("Заказ не найден")
         await Controllers.set_not_found(pickup_point)
 
     async def in_progress(self, pickup_point):
+        print("Мы еще готовим блюдо")
         await Controllers.set_in_progress(pickup_point)
 
     async def start_delivery(self, pickup_point):

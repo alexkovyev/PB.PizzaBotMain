@@ -137,7 +137,7 @@ class CutStation(object):
         self.is_free = asyncio.Event()
         self.be_free_at = None
 
-    async def set_occupied(self, unix_time=time.time()):
+    async def set_occupied(self, duration):
         """
         Этот метод помечает, что станция нарезки занята и освободится
         в секундах с момента epoch.
@@ -145,7 +145,7 @@ class CutStation(object):
         as a floating point number.
         """
         self.is_free.clear()
-        self.be_free_at = unix_time
+        self.be_free_at = time.time() + duration
 
     async def set_free(self):
         """ Этот метод уведомляет всех желающих о том,

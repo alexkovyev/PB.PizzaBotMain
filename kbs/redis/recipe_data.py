@@ -45,16 +45,16 @@ filling = {1: {"cutting_program": ({"program_id": 2, "duration": 10},
                                    {"program_id": 4, "duration": 10},
                                    {"program_id": 9, "duration": 10}),
                "pre_heating_program": {1: 1, 2: 1, 3: 1, 4: 1},
-               "cooking_program": {1: (1, 180), 2: (2, 180), 3: (1, 180), 4: (1, 180)},
-               "stand_by_program": {1: 2, 2: 2, 3: 2, 4: 2},
-               "make_crust_program": {1: (1, 20), 2: (2, 20), 3: (1, 25), 4: (1, 37)},
+               "cooking_program": {1: 2, 2: 2, 3: 2, 4: 2},
+               "make_crust_program": {1: 3, 2: 3, 3: 3, 4: 3},
                }
            }
 
 filling_chain = []
 
 # additive chain_id: plan_time
-additive = {1: 5}
+additive = {"id": 1,
+            "duration": 10}
 
 recipe_data = {
     "dough": dough,

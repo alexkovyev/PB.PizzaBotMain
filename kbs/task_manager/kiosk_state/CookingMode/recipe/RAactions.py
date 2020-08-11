@@ -70,9 +70,9 @@ class BaseRA(ToolsMixin):
             print("Ошибка атомарного действия")
 
 
-class BaseActionsRA(BaseRA, ConfigMixin):
+class BaseActionsRA(BaseRA):
 
-    async def move_to_object(self, move_params, equipment):
+    async def move_to_object(self, move_params, equipment, *args):
         """Эта функция описывает движение до определенного места.
 
         ПЕРЕПИСАТЬ документацию
@@ -141,7 +141,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
         await self.chain_execute(what_to_do, equipment)
         print(f"PBM {time.time()} - Привезли ингредиент начинки в нарезку")
 
-    async def change_gripper(self, required_gripper,  equipment):
+    async def change_gripper(self, required_gripper,  equipment, *args):
         """метод, запускающий смену захвата при необходимости """
 
         current_gripper = await RA.get_current_gripper()
@@ -165,8 +165,12 @@ class BaseActionsRA(BaseRA, ConfigMixin):
                     # Потом удалить, эмуляция работы
                     current_gripper = required_gripper
 
-    async def get_vane_from_oven(self, oven_unit, *args):
+    async def get_vane_from_oven(self, *args):
         """Этот метод запускает группу атомарных действий ra_api по захвату лопатки из печи"""
+
+        *_, dish = args
+
+        oven_unit = dish.oven_unit.oven_id
 
         atomic_params = {"name": "get_vane_from_oven",
                          "place": oven_unit}
@@ -203,7 +207,9 @@ class BaseActionsRA(BaseRA, ConfigMixin):
         """Этот метод опускает п-ф в станцию нарезки"""
         print(f"PBM {time.time()} - Начинаем размещать продукт в станции нарезки")
 
-        _, equipment = args
+        # print(args)
+
+        _, equipment, dish = args
 
         print("Станция нарезки свободна", equipment.cut_station.is_free.is_set())
 
@@ -212,7 +218,7 @@ class BaseActionsRA(BaseRA, ConfigMixin):
             "place": self.SLICING
         }
 
-        while not equipment.cut_station.is_free.is_set() and not self.is_dish_failed:
+        while not equipment.cut_station.is_free.is_set() and not dish.is_dish_failed:
             print(f"PBM {time.time()} Станция нарезки занята, танцуем с продуктом")
             print()
             await asyncio.sleep(1)

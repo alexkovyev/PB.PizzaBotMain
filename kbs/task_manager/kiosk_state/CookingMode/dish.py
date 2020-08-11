@@ -5,7 +5,7 @@ import time
 
 from .recipe.dish_recipe import DishRecipe
 from kbs.ra_api.RA import RA, RAError
-from kbs.data.kiosk_modes.cooking_mode import Status
+from kbs.data.kiosk_modes.cooking_mode import Status, CookingModeConst
 from kbs.exceptions import ControllersFailedError
 
 
@@ -61,6 +61,7 @@ class Dish(DishStatus, DishRecipe):
         self.id = dish_id
         self.order_ref_id = order_ref_id
         self.is_last_dish_in_order = False
+
         # распаковываем данные о том, из чего состоит блюдо
         self.dough = BaseDough(dish_data["dough"])
         self.sauce = BaseSauce(dish_data["sauce"])
@@ -68,15 +69,22 @@ class Dish(DishStatus, DishRecipe):
         self.additive = BaseAdditive(dish_data["additive"])
 
         self.oven_unit = free_oven_object
+        self.oven_recipes = self.fill_oven_recipes(dish_data)
         self.cooking_recipe = self.create_dish_recipe()
         # self.delivery_chain_list = self.create_dish_delivery_recipe()
         # self.throwing_away_chain_list = self.throwing_dish_away()
-        self.baking_program = dish_data["filling"]["cooking_program"]
-        self.make_crust_program = dish_data["filling"]["make_crust_program"]
-        self.pre_heating_program = dish_data["filling"]["pre_heating_program"]
-        self.stand_by = dish_data["filling"]["stand_by"]
+
         # у каждой ячейки выдачи есть 2 "лотка", нужно распределить в какой лоток помещает блюдо
         self.pickup_point_unit: int
+
+    @staticmethod
+    def fill_oven_recipes(dish_data):
+        oven_recipes = {
+            "cooking_program": dish_data["filling"]["cooking_program"],
+            "make_crust_program": dish_data["filling"]["make_crust_program"],
+            "pre_heating_program": dish_data["filling"]["pre_heating_program"],
+        }
+        return oven_recipes
 
     async def half_staff_cell_evaluation(self):
         """Этот метод назначает п-ф из БД"""
@@ -101,15 +109,11 @@ class Dish(DishStatus, DishRecipe):
 
         _, equipment = args
 
-        dough_point = self.dough.halfstuff_cell
-        sauce_recipe = self.sauce.sauce_cell
-        oven_unit = self.oven_unit.id
-
         to_do = ((self.change_gripper, "None"),
                  (self.move_to_object, (self.oven_unit, None)),
-                 (self.get_vane_from_oven, oven_unit),
+                 (self.get_vane_from_oven, None),
                  (self.move_to_object, (self.SLICING, None)),
-                 (self.get_dough, dough_point),
+                 (self.get_dough, None),
                  (self.control_dough_position, None),
                  (self.move_to_object, (self.SLICING, None)),
                  (self.leave_vane_in_cut_station, None),
@@ -122,7 +126,26 @@ class Dish(DishStatus, DishRecipe):
         print()
 
         if not self.is_dish_failed:
-            asyncio.create_task(self.give_sauce(sauce_recipe, equipment))
+            sauce_recipe = self.sauce.sauce_cell
+            duration = self.sauce.sauce_recipe["duration"]
+            asyncio.create_task(self.give_sauce(sauce_recipe, duration, equipment))
+
+    async def turn_on_oven_heating(self, storage_address, equipment,
+                                   cutting_program, is_ready_for_baking):
+
+        additive_time = self.additive.duration
+
+        time_before_baking = await self.time_calculation(storage_address,
+                                                         equipment,
+                                                         cutting_program,
+                                                         additive_time,
+                                                         self.oven_unit.oven_id)
+
+        time_gap_to_heating = time_before_baking - CookingModeConst.OVEN_HEATING_DURATION
+
+        print(f"PBM {time.time()} - Запустили прогрев")
+        heating_task = asyncio.create_task(self.controllers_turn_heating_on(self, time_gap_to_heating,
+                                                                            is_ready_for_baking))
 
     async def prepare_filling_item(self, *args):
         """Чейн по доставке и нарезки 1 п-ф
@@ -131,10 +154,9 @@ class Dish(DishStatus, DishRecipe):
         """
         # print("Это аргс из начинки", args)
         filling_data, equipment = args
-        filling_item = filling_data["id"]
-        cutting_program = filling_data["cut_program"]
-        storage_address = filling_data["location"]
-        is_last_item = filling_data["is_last"]
+
+        filling_item, cutting_program, storage_address, is_last_item = \
+            await self.unpack_filling_data(filling_data)
 
         to_do = (
             (self.change_gripper, "product"),
@@ -145,27 +167,22 @@ class Dish(DishStatus, DishRecipe):
         await asyncio.sleep(0.2)
         print(f"PBM - {time.time()} Начинаем готовить {filling_item.upper()}")
 
+        is_ready_for_baking = asyncio.Event()
+
         if is_last_item:
             await asyncio.sleep(0.1)
-            time_to_do = await self.time_calculation(storage_address, equipment, cutting_program)
 
-            print("Это время в time_calculation", time_to_do)
-
-            time_gap_to_heating = time_to_do - 15
-
-            print("time_gap", time_gap_to_heating)
-
-            is_ready_for_baking = asyncio.Event()
-
-            print(f"PBM {time.time()} - Запустили прогрев")
-            heating_task = asyncio.create_task(self.controllers_turn_heating_on(time_gap_to_heating,
-                                                                                is_ready_for_baking))
+            await self.turn_on_oven_heating(storage_address,
+                                            equipment,
+                                            cutting_program,
+                                            is_ready_for_baking)
 
         await self.chain_execute(to_do, equipment)
 
         if not self.is_dish_failed:
             asyncio.create_task(self.cut_half_staff(cutting_program,
                                                     equipment,
+                                                    self,
                                                     is_last_item))
             print(f"PBM {time.time()} - Запустили нарезку п-ф в очередь")
             print()
@@ -212,7 +229,7 @@ class Dish(DishStatus, DishRecipe):
             for chain in chain_list:
                 if not self.is_dish_failed:
                     chain, params = chain
-                    await chain(params, equipment)
+                    await chain(params, equipment, self)
                 else:
                     break
         except (RAError, ControllersFailedError):
@@ -254,7 +271,6 @@ class BaseSauce(BasePizzaPart):
         self.sauce_recipe = sauce_data["recipe"]
         # sauce_cell=[(1, 1), (2, 2)] 0 - id насосной станции, 1 - программа запуска
         self.sauce_cell = self.unpack_data(sauce_data)
-
 
     def unpack_data(self, sauce_data):
         """выводт данные в виде [(cell_id, program_id), (None, 3)]"""
@@ -311,6 +327,7 @@ class BaseAdditive(BasePizzaPart):
     def __init__(self, additive_data):
         self.halfstuff_id = additive_data["id"]
         self.halfstuff_cell = None
+        self.duration = additive_data["recipe"]["duration"]
 
     def __repr__(self):
         return f"Добавка {self.halfstuff_id}"

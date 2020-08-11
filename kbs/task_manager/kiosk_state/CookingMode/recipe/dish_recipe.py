@@ -4,14 +4,14 @@
 import asyncio
 import time
 
+from .utils import DurationEvaluation
 from .ControllersActions import BaseActionsControllers
 from .RAactions import BaseActionsRA
 
-from kbs.ra_api.RA import RA
 from kbs.cntrls_api.ControllerBus import Controllers
 
 
-class DishRecipe(BaseActionsRA, BaseActionsControllers):
+class DishRecipe(BaseActionsRA, BaseActionsControllers, DurationEvaluation):
 
     # async def prepare_dough_and_sauce(self, *args):
     #     """Метод рецепта, описываюший этап возьи тесто и полей соусом

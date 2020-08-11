@@ -165,7 +165,7 @@ class CookingMode(CookingModeHandlers, Utils):
         """
         for dish in dish_list:
             print("Записываем статус блюда на почти готово", dish)
-            dish_object = await self.get_dish_object(dish)
+            dish_object = await self.get_dish_object(dish, self.current_orders_proceed)
             print("1 блюдо в заказе?", dish_object.is_last_dish_in_order)
             if dish_object.is_last_dish_in_order:
                 print("заказ почти готов", dish_object.order_ref_id)

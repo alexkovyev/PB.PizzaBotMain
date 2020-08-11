@@ -174,30 +174,40 @@ class Controllers(Movement):
         return result
 
     @classmethod
-    async def start_baking(cls, oven_unit, oven_mode, program,
-                           time_changes_requset = None):
+    async def start_baking(cls, oven_unit, program,
+                           time_changes_requset):
         """Запускает выпечку в конкртеной печи
         :param oven_unit: uuid4
-               oven_mode: str
                program: int
                time_changes_request: future object
         oven_mode options:
         - "pre_heating"
         - "baking"
-        - "stand_by"
         - "make_crust"
         убрать режим
         :return
                sets data in time_changes_request {oven_id: unix_time} для всех печей, время которых изменилось
                result: bool or raise OvenError
          """
-        print("Начинаем",oven_mode, "в", oven_unit, time.time())
-        if oven_mode == "pre_heating":
+        print(program)
+        if program == 1:
+            oven_mode = "разогрев печи"
+            print("Начинаем", oven_mode, "в", oven_unit, time.time())
+            time_changes_requset.set_result({})
             await asyncio.sleep(15)
-        else:
+            print("контроллеры закончили", oven_mode, time.time())
+            return True
+        elif program == 2:
+            oven_mode = "выпечка"
+            print("Начинаем", oven_mode, "в", oven_unit, time.time())
             time_changes_requset.set_result({oven_unit: (time.time() + 60)})
-            print("ФУУУУУУТУУУУРА установлен результат", time_changes_requset)
             await asyncio.sleep(60)
+        elif program == 3:
+            oven_mode = "корочкообразование"
+            print("Начинаем", oven_mode, "в", oven_unit, time.time())
+            time_changes_requset.set_result({})
+            await asyncio.sleep(30)
+
         print("контроллеры закончили", oven_mode, time.time())
         return True
 

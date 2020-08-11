@@ -74,9 +74,8 @@ class OrderInitialData(object):
         dough_id = dish["dough"]["id"]
         dish["filling"]["cooking_program"] = recipe_base["filling"][filling_id]["cooking_program"][dough_id]
         dish["filling"]["make_crust_program"] = recipe_base["filling"][filling_id]["make_crust_program"][dough_id]
-        dish["filling"]["pre_heating_program"] = recipe_base["filling"][filling_id]["pre_heating_program"][
-            dough_id]
-        dish["filling"]["stand_by"] = recipe_base["filling"][filling_id]["stand_by_program"][dough_id]
+        dish["filling"]["pre_heating_program"] = recipe_base["filling"][filling_id]["pre_heating_program"]\
+        [dough_id]
         halfstaff_content = dish["filling"]["content"]
         cutting_program = recipe_base["filling"][filling_id]["cutting_program"]
         dish["filling"]["content"] = [list(_) for _ in (zip(halfstaff_content, cutting_program))]
@@ -114,9 +113,10 @@ class OrderInitialData(object):
         'content': ((6, {'program_id': 2, 'duration': 10}), (2, {'program_id': 1, 'duration': 12}),
         (3, {'program_id': 5, 'duration': 15}), (3, {'program_id': 8, 'duration': 8}),
         (6, {'program_id': 4, 'duration': 17}), (8, {'program_id': 9, 'duration': 9})),
-        'cooking_program': (2, 180), 'make_crust_program': (2, 20), 'chain': {}},
+        'cooking_program': (2, 180), 'make_crust_program': (2, 20)},
 
-        'additive': {'id': 7, 'recipe': {1: 5}}},
+        'additive': {'id': 7, 'recipe': {"id": 1,
+            "duration": 5}}},
 
         {'dough': {'id': 1, 'recipe': {1: 10, 2: 5, 3: 10, 4: 10, 5: 12, 6: 7, 7: 2}},
 
@@ -132,9 +132,10 @@ class OrderInitialData(object):
         (2, {'program_id': 1, 'duration': 12}), (3, {'program_id': 5, 'duration': 15}),
         (3, {'program_id': 8, 'duration': 8}), (6, {'program_id': 4, 'duration': 17}),
         (8, {'program_id': 9, 'duration': 9})),
-        'cooking_program': (1, 180), 'make_crust_program': (1, 20), 'chain': {}},
+        'cooking_program': (1, 180), 'make_crust_program': (1, 20)},
 
-        'additive': {'id': 1, 'recipe': {1: 5}}}]}
+        'additive': {'id': 1, 'recipe': {"id": 1,
+            "duration": 5}}}]}
 """
 
         # print("Входные данные", new_order_check_code)

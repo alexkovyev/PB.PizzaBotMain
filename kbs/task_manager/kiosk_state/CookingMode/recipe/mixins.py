@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from .utils import DurationEvaluation
+# from .utils import DurationEvaluation
 
 
 class ConfigMixin(object):
@@ -15,7 +15,7 @@ class ConfigMixin(object):
     STOP_STATUS = "failed_to_be_cooked"
 
 
-class ToolsMixin(DurationEvaluation):
+class ToolsMixin(ConfigMixin):
 
     @staticmethod
     async def is_need_to_change_gripper(current_gripper: str, required_gripper: str):
@@ -36,3 +36,15 @@ class ToolsMixin(DurationEvaluation):
             return time_to_dance if time_to_dance >1 else False
         else:
             return False
+
+    @staticmethod
+    async def unpack_filling_data(filling_data):
+        """Этот метод распаковывает данные об ингредиенте
+        начинки, необходимой для запуска чейна
+        """
+        filling_item = filling_data["id"]
+        cutting_program = filling_data["cut_program"]
+        storage_address = filling_data["location"]
+        is_last_item = filling_data["is_last"]
+
+        return filling_item, cutting_program, storage_address, is_last_item
