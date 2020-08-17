@@ -30,7 +30,7 @@ class CookingMode(CookingModeHandlers, Utils):
         self.all_recipes = recipes
         self.equipment = equipment
         self.current_orders_proceed = {}
-        self.orders_requested_for_delivery = {}
+        # self.orders_requested_for_delivery = {}
         self.oven_time_changes_event = {"event": asyncio.Event(), "result": None}
         # разные полезные очереди по приоритету
         self.main_queue = asyncio.Queue()
@@ -51,29 +51,6 @@ class CookingMode(CookingModeHandlers, Utils):
         :return bool
         """
         return True if new_order_id not in self.current_orders_proceed else False
-
-    # @staticmethod
-    # async def put_chains_in_queue(dish, queue):
-    #     """Добавляет чейны рецепта в очередь в виде кортежа (dish, chain)"""
-    #     chains = dish.cooking_recipe
-    #     for chain in chains:
-    #         await queue.put(chain)
-
-    # async def get_dish_object(self, dish_id):
-    #     """Этот метод возращает экземпляр класса блюда по заданному ID"""
-    #     for order in self.current_orders_proceed.values():
-    #         for dish in order.dishes:
-    #             if dish.id == dish_id:
-    #                 return dish
-
-    # @staticmethod
-    # async def change_oven_in_dish(dish_object, new_oven_object):
-    #     """ Этот метод переназнаает печь в блюде
-    #     :param dish_object: объект блюда
-    #     :param new_oven_object: объект печи
-    #     :return: dish instance BaseDish class
-    #     """
-    #     dish_object.oven_unit = new_oven_object
 
     async def new_order_proceed(self, order):
         """Этот метод совершает действия по обработке заказа после создания"""
@@ -194,7 +171,7 @@ class CookingMode(CookingModeHandlers, Utils):
         if chain_to_do.__self__.status != Status.STOP_STATUS:
             print(f"PBM {time.time()} - Готовим блюдо {chain_to_do.__self__.id}")
             print()
-            # print("ЭТО ПАРАМС", params)
+
             await chain_to_do(params, self.equipment)
 
     async def qr_code_scanned_handler(self, **kwargs):
@@ -296,3 +273,34 @@ class CookingMode(CookingModeHandlers, Utils):
                     await self.run_chain(chain_to_do)
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
+
+
+class CookingQueue(object):
+
+    def __init__(self):
+        self.current_stop = time.time()
+        self.current_gripper = None
+
+        self.high_priority_left = []
+        self.chains_left = []
+
+    @property
+    def be_free_at(self):
+        if self.current_stop > time.time():
+            be_free_at = self.current_stop
+        else:
+            be_free_at = time.time()
+        if self.chains_left:
+            for chain in self.chains_left:
+                be_free_at += chain(1)
+        return be_free_at
+
+    async def get_item(self):
+        if self.chains_left:
+            chain_to_do = self.chains_left.pop(0)
+            if self.current_stop is None:
+                self.current_stop = time.time()
+            self.current_stop += chain_to_do[1]
+            print(self.current_stop)
+            print("Забрали элемент", item)
+            return item

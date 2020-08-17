@@ -158,3 +158,10 @@ class DurationEvaluation(RA, ConfigMixin):
         print("ИТОГОвое время", time_left)
 
         return time_left
+
+    async def delivery_time_calculation(self, dish, current_location, current_gripper):
+        if current_gripper != None:
+            total_time = await self.time_for_change_gripper(current_location, current_gripper)
+        else:
+            total_time = 0
+

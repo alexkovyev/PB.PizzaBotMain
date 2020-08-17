@@ -71,7 +71,7 @@ class Dish(DishStatus, DishRecipe):
         self.oven_unit = free_oven_object
         self.oven_recipes = self.fill_oven_recipes(dish_data)
         self.cooking_recipe = self.create_dish_recipe()
-        # self.delivery_chain_list = self.create_dish_delivery_recipe()
+        self.delivery_chain_list = self.create_dish_delivery_recipe()
         # self.throwing_away_chain_list = self.throwing_dish_away()
 
         # у каждой ячейки выдачи есть 2 "лотка", нужно распределить в какой лоток помещает блюдо

@@ -46,7 +46,7 @@ filling = {1: {"cutting_program": ({"program_id": 2, "duration": 10},
                                    {"program_id": 9, "duration": 10}),
                "pre_heating_program": {1: 1, 2: 1, 3: 1, 4: 1},
                "cooking_program": {1: 2, 2: 2, 3: 2, 4: 2},
-               "make_crust_program": {1: 3, 2: 3, 3: 3, 4: 3},
+               "make_crust_program": {1: (3, 120), 2: (3, 120), 3: (3, 120), 4: (3, 120)},
                }
            }
 

@@ -66,18 +66,24 @@ class QRCodeHandler(object):
     """
     Это описание
     """
-    async def not_found(self, pickup_point):
+
+    def __init__(self):
+        self.orders_requested_for_delivery = []
+
+    async def not_found(self, pickup_point, *args):
         print("Заказ не найден")
         await Controllers.set_not_found(pickup_point)
 
-    async def in_progress(self, pickup_point):
+    async def in_progress(self, pickup_point, *args):
         print("Мы еще готовим блюдо")
         await Controllers.set_in_progress(pickup_point)
 
-    async def start_delivery(self, pickup_point):
-        pass
+    async def start_delivery(self, pickup_point, order_check_code, current_orders_proceed):
+        order = current_orders_proceed[order_check_code]
+        await self.order_delivery_proceed(order, pickup_point)
+        self.orders_requested_for_delivery.append(order_check_code)
 
-    async def time_is_up(self, pickup_point):
+    async def time_is_up(self, pickup_point, *args):
         await Controllers.set_time_is_up(pickup_point)
 
     async def request_delivery_handler(self, order_check_code, pickup_point, current_orders_proceed):
@@ -112,14 +118,22 @@ class QRCodeHandler(object):
         else:
             handler_to_launch = self.not_found
 
-        await handler_to_launch(pickup_point)
+        await handler_to_launch(pickup_point, order_check_code, current_orders_proceed)
 
-    async def delivery_request_handler(self, order_check_code):
-        """Запускает процедуру выдачи заказа
-        ДОБАВИТЬ ОЧИСТКУ поля ПЕЧЬ после упаковке --> oven_unit = None"""
-        for dish in self.current_orders_proceed[order_check_code].dishes:
-            print("Вот это блюдо выдаем", dish)
-            # не сделано
+    async def order_delivery_proceed(self, order, pick_up_point):
+        for dish, index in enumerate(order.dishes):
+            dish.pickup_point_unit = (pick_up_point, index)
+
+    async def create_delivery_recipe(self, order):
+        for dish in order.dishes:
+            pass
+
+    # async def delivery_request_handler(self, order_check_code):
+    #     """Запускает процедуру выдачи заказа
+    #     ДОБАВИТЬ ОЧИСТКУ поля ПЕЧЬ после упаковке --> oven_unit = None"""
+    #     for dish in self.current_orders_proceed[order_check_code].dishes:
+    #         print("Вот это блюдо выдаем", dish)
+    #         # не сделано
 
 
 class CookingModeHandlers(BrokenEquipmentHandler, QRCodeHandler):
