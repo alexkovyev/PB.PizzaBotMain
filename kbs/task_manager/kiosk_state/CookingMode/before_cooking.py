@@ -7,6 +7,8 @@ from functools import partial
 
 from kbs.redis.recipe_data import recipe_data
 from kbs.task_manager.kiosk_state.BaseMode import BaseMode
+from kbs.cntrls_api.ControllerBus import Controllers
+from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
 
 
 class BeforeCooking(BaseMode):
@@ -23,6 +25,7 @@ class BeforeCooking(BaseMode):
         is_equipment_ok = True
         print("Начинаем тестировать оборудования", time.time())
         time.sleep(4)
+        equipment_data.controllers = Controllers()
         print("Оборудование протестировано, исправно", time.time())
         return is_equipment_ok, equipment_data
 
@@ -38,7 +41,7 @@ class BeforeCooking(BaseMode):
         return recipes
 
     @classmethod
-    async def start_pbm(clx, equipment_data):
+    async def start_cooking(clx, equipment_data):
         """Этот метод запускает режим готовки. Так как это блокирующие операции,
         используется run_in_executor"""
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
@@ -58,3 +61,6 @@ class BeforeCooking(BaseMode):
         task_2 = my_loop.create_task(task_2())
         my_result = await asyncio.gather(task_1, task_2)
         return my_result
+
+    def __str__(self):
+        return KioskModeNames.BEFORECOOKING

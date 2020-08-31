@@ -30,8 +30,11 @@ class Equipment(object):
         self.sauce_dispensers = equipment_data["sauce_dispensers"]
         self.dough_dispensers = equipment_data["dough_dispensers"]
         self.pick_up_points = equipment_data["pick_up_points"]
+        self.ra = None
+        self.controllers = None
 
-    async def is_able_to_cook_checker(self):
+    @property
+    def is_able_to_cook(self):
         """Этот метод проверяет можно ли готовить, то есть работает ли мин необходмое оборудование, те
         - станция нарезки
         - станция упаковки
@@ -153,3 +156,8 @@ class CutStation(object):
         """
         self.is_free.set()
         self.be_free_at = None
+
+
+class RA(object):
+    def __init__(self, ra_inst=None):
+        self.ra = ra_inst

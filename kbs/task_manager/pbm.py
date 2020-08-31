@@ -2,12 +2,13 @@
 import asyncio
 import uuid
 
+from contextvars import ContextVar
+
 from .equipment import Equipment
 from kbs.data.server.server_const import ServerConfig, ServerMessages
 from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
-from kbs.cntrls_api.ControllerBus import ControllersEvents, event_generator
+from kbs.cntrls_api.ControllerBus import ControllersEvents
 from kbs.notifications.discord_sender import DiscordBotAccess
-# from kbs.task_manager.kiosk_state.CookingMode import CookingMode
 from kbs.task_manager.kiosk_state.CookingMode.mode_main import CookingMode
 from kbs.task_manager.kiosk_state.CookingMode.before_cooking import BeforeCooking
 from kbs.task_manager.kiosk_state import StandByMode
@@ -21,10 +22,9 @@ class PizzaBotMain(object):
     def __init__(self):
         self.current_instance = StandByMode.StandBy()
         self.equipment = None
-        self.events_monitoring = ControllersEvents()
+        # self.events_monitoring = ControllersEvents()
         self.discord_bot_client = DiscordBotAccess()
         self.messages_for_sending = asyncio.Queue()
-        self.is_able_to_cook = True
         self.command_status = {}
 
     @property
@@ -33,14 +33,8 @@ class PizzaBotMain(object):
         корретного ответа сервера на запросы на Api
         :return: str
         """
-        if isinstance(self.current_instance, CookingMode):
-            return KioskModeNames.COOKINGMODE
-        elif isinstance(self.current_instance, StandByMode.StandBy):
-            return KioskModeNames.STANDBYMODE
-        elif isinstance(self.current_instance, TestingMode.TestingMode):
-            return KioskModeNames.TESTINGMODE
-        elif isinstance(self.current_instance, BeforeCooking):
-            return KioskModeNames.BEFORECOOKING
+        current_name = self.current_instance.__class__.__str__(self)
+        return current_name
 
     async def start_cooking_mode(self, future=None, params=None):
         """Это метод непосредственно включает режим готовки
@@ -55,7 +49,7 @@ class PizzaBotMain(object):
         if self.equipment is None:
             print("ОШИБКА ОБОРУДОВАНИЯ")
             self.equipment = await self.add_equipment_data()
-        (is_ok, self.equipment), recipe = await BeforeCooking.start_pbm(self.equipment)
+        (is_ok, self.equipment), recipe = await BeforeCooking.start_cooking(self.equipment)
         self.current_instance = CookingMode(recipe, self.equipment)
         if future is not None and not future.cancelled():
             future.set_result(str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE))
@@ -99,23 +93,23 @@ class PizzaBotMain(object):
                 return "Печь не опознана"
         return str(ServerMessages.SUCCEED_FUTURE_RESULT_CODE)
 
-    async def broken_hardware_handler(self, **kwargs):
-        await self.current_instance.broken_equipment_handler(kwargs, self.equipment)
-        self.is_able_to_cook = await self.equipment.is_able_to_cook_checker()
-        print("Можем ли готовить", self.is_able_to_cook)
-
-    async def qr_code_handler(self, **kwargs):
-        await self.current_instance.qr_code_scanned_handler(**kwargs)
-
-    async def washing_request_handler(self, **kwargs):
-        await self.current_instance.unit_washing_request(**kwargs)
-
-    async def event_handlers_binder(self):
-        """Этот метод привязывает обработчик к событию """
-        loop = asyncio.get_event_loop()
-        self.events_monitoring.bind_async(loop=loop, hardware_status_changed=self.broken_hardware_handler)
-        self.events_monitoring.bind_async(loop=loop, qr_scanned=self.qr_code_handler)
-        self.events_monitoring.bind_async(loop=loop, equipment_washing_request=self.washing_request_handler)
+    # async def broken_hardware_handler(self, **kwargs):
+    #     await self.current_instance.broken_equipment_handler(kwargs, self.equipment)
+    #     self.is_able_to_cook = await self.equipment.is_able_to_cook_checker()
+    #     print("Можем ли готовить", self.is_able_to_cook)
+    #
+    # async def qr_code_handler(self, **kwargs):
+    #     await self.current_instance.qr_code_scanned_handler(**kwargs)
+    #
+    # async def washing_request_handler(self, **kwargs):
+    #     await self.current_instance.unit_washing_request(**kwargs)
+    #
+    # async def event_handlers_binder(self):
+    #     """Этот метод привязывает обработчик к событию """
+    #     loop = asyncio.get_event_loop()
+    #     self.events_monitoring.bind_async(loop=loop, hardware_status_changed=self.broken_hardware_handler)
+    #     self.events_monitoring.bind_async(loop=loop, qr_scanned=self.qr_code_handler)
+    #     self.events_monitoring.bind_async(loop=loop, equipment_washing_request=self.washing_request_handler)
 
     async def get_equipment_data(self):
         """Это метод - заглушка, который имитрует подключение к БД и получение данных
@@ -166,10 +160,10 @@ class PizzaBotMain(object):
         Статус оборудования меняется при обработке поломки оборудования
         """
         while True:
-            if not self.is_able_to_cook:
+            if not self.equipment.is_able_to_cook:
                 print("Готовить не можем, выключаем систему")
                 # не сделано
-            await asyncio.sleep(3)
+            await asyncio.sleep(1)
 
     async def message_sending_worker(self):
         """Это фоновая задача - отправитель уведомлений"""

@@ -8,6 +8,7 @@ from kbs.task_manager.kiosk_state.CookingMode.order_creation_utils import OrderI
 from kbs.exceptions import OvenReservationError, OvenReserveFailed
 from kbs.data.kiosk_modes.cooking_mode import CookingModeConst, Status
 from kbs.ra_api.RA import RA
+from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
 
 
 class CookingMode(CookingModeHandlers, Utils):
@@ -273,6 +274,9 @@ class CookingMode(CookingModeHandlers, Utils):
                     await self.run_chain(chain_to_do)
                 elif not self.low_priority_queue.empty():
                     print("Моем или выкидываем пиццу")
+
+    def __str__(self):
+        return str(KioskModeNames.COOKINGMODE)
 
 
 class CookingQueue(object):

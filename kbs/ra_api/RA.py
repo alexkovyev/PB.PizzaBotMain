@@ -29,9 +29,13 @@ class RA(Movement):
 
     @classmethod
     async def get_position_move_time(clx, from_place: str, to_place: str):
-        """ метод рассчитывает время на перемещение между точками.
+        """
+
+        метод рассчитывает время на перемещение между точками.
         Эмуляция работы: возвращает случайным образом список
         из вариантов или пустой если точка не найдена.
+
+        UPD возвращает мин время
         :param
            from_place: str
            to_place: srt
@@ -41,10 +45,10 @@ class RA(Movement):
         return result_choice
 
     @classmethod
-    async def position_move(cls, place: str, duration: int):
+    async def position_move(cls, place: str, duration: float):
         """
         :param place: str
-        :param duration: int
+        :param duration: float
         :return: int if succeed
                  raiseError if not
                  # нужно определить типы ошибок
@@ -102,4 +106,12 @@ class RA(Movement):
         # gripper_options = ["product", None]
         gripper_options = [None]
         return random.choice(gripper_options)
+
+    async def start_on(self):
+        """включение"""
+        pass
+
+    async def shout_down(self):
+        """выключение"""
+        pass
 

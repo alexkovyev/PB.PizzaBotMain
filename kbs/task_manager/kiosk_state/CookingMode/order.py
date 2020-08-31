@@ -14,11 +14,10 @@ class Order(object):
     # переделать на константы
     self.status: str
 
-
     """
 
     ORDER_STATUS = ["received", "cooking", "ready", "packed", "wait to delivery", "delivered", "closed",
-                    "failed_to_be_cooked", "not_delivered"]
+                    "failed_to_be_cooked", "not_delivered", "partially_ready"]
 
     def __init__(self, new_order_content, ovens_reserved, time_changes_event):
 
@@ -90,7 +89,7 @@ class Order(object):
         await self.change_order_status()
         print("Это статус ЗАКАЗА", self.status)
         await self.set_waiting_timer()
-        # записать в БД статус
+        # записать в БД статус готово
 
     async def change_order_status(self):
         if all(list(map((lambda i: i.status == "failed_to_be_cooked"), self.dishes))):
@@ -99,6 +98,10 @@ class Order(object):
             self.status = "partially_ready"
         else:
             self.status = "ready"
+
+    async def dish_status_changes(self, status):
+        for dish in self.dishes:
+            await dish.change_status(status)
 
     def __repr__(self):
         return f"Заказ № {self.check_code}"

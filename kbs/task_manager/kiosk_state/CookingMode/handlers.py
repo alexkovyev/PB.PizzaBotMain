@@ -80,6 +80,7 @@ class QRCodeHandler(object):
 
     async def start_delivery(self, pickup_point, order_check_code, current_orders_proceed):
         order = current_orders_proceed[order_check_code]
+        await order.dish_status_changes("delivery")
         await self.order_delivery_proceed(order, pickup_point)
         self.orders_requested_for_delivery.append(order_check_code)
 
@@ -102,6 +103,7 @@ class QRCodeHandler(object):
         OPTIONS = {
             "received": 2,
             "cooking": 2,
+            "delivery": 1,
             "ready": 3,
             "informed": 3,
             "failed_to_be_cooked": 3

@@ -42,6 +42,6 @@ class PbmScheduler(object):
         """
 
         self.scheduler.add_job(self.turn_on_cooking_mode_scheduler,
-                               'cron', day_of_week='*', hour='13', minute=27, second=30)
+                               'cron', day_of_week='*', hour="12", minute=17, second=30)
         self.scheduler.add_job(self.turn_off_cooking_mode,
                                'cron', day_of_week='*', hour='21', minute=0, second=0)

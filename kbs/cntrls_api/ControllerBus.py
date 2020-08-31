@@ -131,10 +131,10 @@ class Movement(object):
         return result
 
 
-class Controllers(Movement):
+class Dough(Movement):
 
     @classmethod
-    async def give_dough(cls, dough_point):
+    async def give(cls, dough_point):
         """Метод обеспечивает выдачу теста
         :param dough_point: uuid4 str
         :return bool
@@ -146,11 +146,17 @@ class Controllers(Movement):
         print()
         return result
 
+
+class CutTable(Movement):
+
     @classmethod
-    async def give_sauce(cls, sauce_recipe):
+    async def sauce(cls, sauce_recipe):
         """Метод обеспечивает поливание соусом
-        :param sauce_recipe: list [(), ()]
+        :param sauce_recipe: list [(tuple), (tuple)]
         для вложенного кортежа: 0 - id насосной станции uuid str, 1 - программа поливки int
+        поменять на list [(tuple), (tuple)]
+        0 - номер программы поливки →int,
+        1 - id насосной станции uuid → str.
         :return bool
         """
         print(f"CNTRS {time.time()} Поливаем соусом {sauce_recipe}")
@@ -161,7 +167,7 @@ class Controllers(Movement):
         return result
 
     @classmethod
-    async def cut_the_product(cls, cutting_program):
+    async def cut(cls, cutting_program):
         """Метод обеспечивает нарезку продукта
         :param cutting_program: int
         :return bool
@@ -173,18 +179,16 @@ class Controllers(Movement):
         print()
         return result
 
+
+class Oven():
+
     @classmethod
-    async def start_baking(cls, oven_unit, program,
+    async def bake(cls, oven_unit, program,
                            time_changes_requset):
         """Запускает выпечку в конкртеной печи
         :param oven_unit: uuid4
                program: int
                time_changes_request: future object
-        oven_mode options:
-        - "pre_heating"
-        - "baking"
-        - "make_crust"
-        убрать режим
         :return
                sets data in time_changes_request {oven_id: unix_time} для всех печей, время которых изменилось
                result: bool or raise OvenError
@@ -211,8 +215,15 @@ class Controllers(Movement):
         print("контроллеры закончили", oven_mode, time.time())
         return True
 
+    @staticmethod
+    async def turn_off():
+        pass
+
+
+class Paper(Movement):
+
     @classmethod
-    async def give_paper(cls):
+    async def give(cls):
         """Метод выдает бумагу в станции упаковки
         без параметров) """
         print("Выдаем упаковку", time.time())
@@ -220,27 +231,40 @@ class Controllers(Movement):
         print("контроллеры закончили выдавать бумагу", time.time())
         return result
 
+
+class Dispenser(Movement):
+
     @classmethod
-    async def set_not_found(cls, pick_up_point):
+    async def unknown_code(cls, pick_up_point):
         """Метод выставляет режим работы пункта выдачи"""
         return True
 
     @classmethod
-    async def set_in_progress(cls, pick_up_point):
+    async def not_ready(cls, pick_up_point):
         """Метод выставляет режим работы пункта выдачи"""
         return True
 
     @classmethod
-    async def set_time_is_up(cls, pick_up_point):
+    async def out_of_time(cls, pick_up_point):
         """Метод выставляет режим работы пункта выдачи"""
         return True
 
     @classmethod
-    async def set_is_ready(cls, pick_up_point):
+    async def ready(cls, pick_up_point):
         """Метод выставляет режим работы пункта выдачи"""
         return True
 
     @classmethod
-    async def deliver_order(cls):
+    async def dispense(cls):
         """Метод запускает процедуру выдачи заказа и уведомления о том, получен ли заказ"""
         pass
+
+
+class Controllers(Movement):
+
+    def __init__(self):
+        self.cntrls_events = ControllersEvents()
+        self.dough = Dough()
+        self.cut_table = CutTable()
+        self.oven = Oven()
+        self.dispenser = Dispenser()

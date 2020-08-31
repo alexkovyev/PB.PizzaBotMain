@@ -13,13 +13,11 @@ class BaseActionsControllers():
         print(f"PBM {time.time()} Получаем тесто у контроллеров")
         print()
 
-        print(args)
-
-        *_, dish = args
+        *_, equipment, dish = args
 
         dough_point = dish.dough.halfstuff_cell
 
-        operation_result = await Controllers.give_dough(dough_point)
+        operation_result = await equipment.controllers.dough.give(dough_point)
 
         if operation_result:
             print(f"PBM {time.time()} успешно получили тесто у контроллеров")
@@ -36,7 +34,7 @@ class BaseActionsControllers():
         print()
 
         await equipment.cut_station.set_occupied(duration)
-        operation_result = await Controllers.give_sauce(sauce_recipe)
+        operation_result = await equipment.controllers.cut_table.sauce(sauce_recipe)
 
         if operation_result:
             print(f"PBM {time.time()} успешно полили соусом")
@@ -61,7 +59,7 @@ class BaseActionsControllers():
 
         await equipment.cut_station.set_occupied(duration)
 
-        result = await Controllers.cut_the_product(program_id)
+        result = await equipment.controllers.cut_table.cut(program_id)
 
         if result:
             print("успешно нарезали п\ф", time.time())
@@ -91,12 +89,12 @@ class BaseActionsControllers():
             # расписать какая ошибка: - замятие бумаги или полная поломка
             # если замятие, добавить вызов ra_api на уборку бумаги
 
-    async def controllers_oven(self, recipe, dish):
+    async def controllers_oven(self, recipe, dish, equipment):
         """Это основной метод взаимодействия с печью """
 
         oven_id = dish.oven_unit.oven_id
         time_changes = asyncio.get_running_loop().create_future()
-        oven_task = asyncio.create_task(Controllers.start_baking(oven_id, recipe,
+        oven_task = asyncio.create_task(equipment.controllers.oven.bake(oven_id, recipe,
                                                      time_changes))
 
         while not time_changes.done():
@@ -108,31 +106,32 @@ class BaseActionsControllers():
 
         return oven_task.result()
 
-    async def controllers_turn_heating_on(self, dish, time_gap, is_ready_for_baking):
+    async def controllers_turn_heating_on(self, dish, time_gap, is_ready_for_baking, equipment):
         """Метод запускает прогрев печи"""
 
         print("Начинаем ждать запуск прогрева печи", time.time())
 
         recipe = dish.oven_recipes["pre_heating_program"]
         await asyncio.sleep(time_gap)
-        operation_result = await self.controllers_oven(recipe, dish)
+        operation_result = await self.controllers_oven(recipe, dish, equipment)
 
         print("Закончили прогрев печи", time.time())
 
         if operation_result:
             await is_ready_for_baking.wait()
-            await self.controllers_bake(dish)
+            await self.controllers_bake(dish, equipment)
 
-    async def controllers_bake(self, dish, *args):
+    async def controllers_bake(self, dish, equipment, *args):
         """Метод запускает выпечку"""
         print("Начинаем выпечку", time.time())
 
         recipe = dish.oven_recipes["cooking_program"]
+        # проверить повторное установление статуса
         dish.status = "baking"
 
         print("Это номер рецепта",recipe)
 
-        operation_result = await self.controllers_oven(recipe, dish)
+        operation_result = await self.controllers_oven(recipe, dish, equipment)
 
         print("Закончили выпечку")
 
@@ -142,5 +141,6 @@ class BaseActionsControllers():
             dish.is_dish_ready.set()
             print("БЛЮДО ГОТОВО", time.time())
             dish.status = "ready"
+            # убрать таймер для заказа, так как запуск для блюла не нужен
             dish.oven_unit.status = "waiting_15"
             print("Это результат установки", dish.is_dish_ready.is_set())

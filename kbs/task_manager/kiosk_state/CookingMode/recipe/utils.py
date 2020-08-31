@@ -57,7 +57,6 @@ class DurationEvaluation(RA, ConfigMixin):
 
         return time_to_move_back
 
-
     async def time_to_bring_half_staff(self, cell_location_tuple, current_location,
                                        equipment, time_to_change_gripper):
         """

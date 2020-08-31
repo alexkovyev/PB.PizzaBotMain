@@ -12,7 +12,7 @@ from kbs.exceptions import ControllersFailedError
 class DishStatus(object):
     """
     Расшифровка статусов блюда:
-    - received: блюдо получено, ждет в очереди
+    - received: блюдо получен, ждет в очереди готовки
     - cooking: лопатка достана из печи, идет готовка на любой стадии
     - baking: пицца находится в печи на выпечке
     - ready: пицца выпечена
@@ -22,7 +22,7 @@ class DishStatus(object):
     - time_is_up: блюдо не забрали, выбрашено
     """
 
-    DISH_STATUSES = ["received", "cooking", "baking", "failed_to_be_cooked", "ready",
+    DISH_STATUSES = ["received", "cooking", "baking", "failed_to_be_cooked", "ready", "delivery",
                      "packed", "time_is_up"]
 
     def __init__(self, time_changes_event):
@@ -41,6 +41,11 @@ class DishStatus(object):
 
         self.status = Status.STOP_STATUS
         self.is_dish_ready.set()
+
+    async def change_status(self, status):
+        """Добавить проверку статуса """
+        if isinstance(status, str):
+            self.status = status
 
     async def time_changes_handler(self, time_future):
         """Обрабатывает результаты футуры об изменении времени выпечки"""
@@ -71,7 +76,7 @@ class Dish(DishStatus, DishRecipe):
         self.oven_unit = free_oven_object
         self.oven_recipes = self.fill_oven_recipes(dish_data)
         self.cooking_recipe = self.create_dish_recipe()
-        self.delivery_chain_list = self.create_dish_delivery_recipe()
+        # self.delivery_chain_list = self.create_dish_delivery_recipe()
         # self.throwing_away_chain_list = self.throwing_dish_away()
 
         # у каждой ячейки выдачи есть 2 "лотка", нужно распределить в какой лоток помещает блюдо
@@ -98,9 +103,11 @@ class Dish(DishStatus, DishRecipe):
         async with lock:
             self.status = "cooking"
             self.oven_unit.status = "occupied"
+            if not self.is_last_dish_in_order:
+                print(self.order_ref_id)
 
     async def prepare_dough_and_sauce(self, *args):
-        """Метод рецепта, описываюший этап возьи тесто и полей соусом
+        """Метод рецепта, описываюший этап возьми тесто и полей соусом
         Это bound-method к блюду, поэтому доступны все атрибуты
         экземпляра класса Dish
         """
@@ -145,7 +152,7 @@ class Dish(DishStatus, DishRecipe):
 
         print(f"PBM {time.time()} - Запустили прогрев")
         heating_task = asyncio.create_task(self.controllers_turn_heating_on(self, time_gap_to_heating,
-                                                                            is_ready_for_baking))
+                                                                            is_ready_for_baking, equipment))
 
     async def prepare_filling_item(self, *args):
         """Чейн по доставке и нарезки 1 п-ф

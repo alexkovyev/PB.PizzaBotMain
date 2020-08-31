@@ -64,7 +64,7 @@ class Handlers(HandlersUtils):
           description: "Ошибка сервера"
 
         command_uuid - это уникальный идентификатор команды, который генерируется сервером
-        в responce при запросе на api старт команды
+        в response при запросе на api старт команды
 
         """
 
@@ -78,6 +78,20 @@ class Handlers(HandlersUtils):
             message = ServerMessages.UUID_COMMAND_NOT_FOUND
             raise web.HTTPBadRequest(text=message,
                                      content_type='text/plain')
+
+    @classmethod
+    async def can_receive_order(cls, request):
+        """Этот метод определяет можно ли принимать заказы с точки зрения
+        работоспособности оборудования и активации режима работы"""
+
+        print("Получен запрос с оценкой можно ли работать")
+        is_ok_eq = pizza_bot_main.equipment.is_able_to_cook
+        current_state = pizza_bot_main.current_state
+        if current_state == KioskModeNames.COOKINGMODE and is_ok_eq:
+            response_text = "true"
+        else:
+            response_text = "false"
+        return web.Response(text=response_text, content_type='text/plain')
 
     @classmethod
     async def new_order_handler(cls, request):
@@ -128,8 +142,8 @@ class Handlers(HandlersUtils):
                 else:
                     message = ServerMessages.DOUBLE_ORDER_MESSAGE
                     raise web.HTTPOk(text=message, content_type='text/plain')
-            except AttributeError:
-                print("Не создан инстанс cooking mode или метод не найден")
+            except AttributeError as e:
+                print("Вот такая ошибка возникла", e)
                 message = ServerConfig.SERVER_ERROR_MESSAGE
                 raise web.HTTPInternalServerError(text=message,
                                                   content_type='text/plain')
@@ -170,6 +184,9 @@ class Handlers(HandlersUtils):
         elif current_kiosk_state == KioskModeNames.TESTINGMODE:
             await cls.response_state_is_busy(current_kiosk_state)
 
+        else:
+            print(current_kiosk_state)
+
     @classmethod
     async def start_full_testing_handler(cls, request):
         """Этот метод обрабатывает запрос на запуск полного тестирования системы
@@ -190,6 +207,7 @@ class Handlers(HandlersUtils):
         """
         print("Получили запрос на включение режима тестирования")
         current_kiosk_state = pizza_bot_main.current_state
+        print("Вот этот стейт", current_kiosk_state)
 
         if current_kiosk_state == KioskModeNames.COOKINGMODE:
             await cls.response_state_is_busy(current_kiosk_state)
