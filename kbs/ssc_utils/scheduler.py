@@ -1,7 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
-from ..task_manager.pbm import pizza_bot_main
+# from ..task_manager.pbm import pizza_bot_main
 
 
 class PbmScheduler(object):
@@ -10,12 +10,12 @@ class PbmScheduler(object):
     Само планрование осуществляется в методе add_planned_jobs
     """
 
-    def __init__(self):
+    def __init__(self, pbm):
         self.scheduler = AsyncIOScheduler()
+        self.pizza_bot_main = pbm
         self.add_planned_jobs()
 
-    @staticmethod
-    async def turn_on_cooking_mode_scheduler():
+    async def turn_on_cooking_mode_scheduler(self):
         """ Этот метод обрабатывает включение режима готовки по расписанию.
         ДОДЕЛАТЬ: придумать обработку невозможности включения режима
         """
@@ -24,11 +24,11 @@ class PbmScheduler(object):
                                         KioskModeNames.COOKINGMODE,
                                         KioskModeNames.BEFORECOOKING]
 
-        kiosk_current_state = pizza_bot_main.current_state
+        kiosk_current_state = self.pizza_bot_main.current_state
 
         if kiosk_current_state not in IMPOSSIBLE_TO_TURN_ON_STATES:
             print("запускаем включение по планровщику")
-            await pizza_bot_main.start_cooking_mode()
+            await self.pizza_bot_main.start_cooking_mode()
         else:
             print("киоск занят, не могу включить")
 

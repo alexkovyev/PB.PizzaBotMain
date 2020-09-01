@@ -8,11 +8,16 @@ import json
 
 from ..data.server.server_const import ServerMessages
 from ..data.kiosk_modes.kiosk_modes import KioskModeNames
-from ..task_manager.pbm import pizza_bot_main
+# from ..task_manager.pbm import pizza_bot_main
 
 
 class HandlersUtils(object):
     """ Это вспомогательные методы по подготовке ответа на запросы"""
+
+    @staticmethod
+    async def get_state_data(request):
+        """Этот метод достает данные состояния из глобального контекста"""
+        return request.app["state"]
 
     @staticmethod
     async def if_no_body_error_response(request, text=ServerMessages.EMPTY_REQUEST_BODY):
@@ -29,7 +34,7 @@ class HandlersUtils(object):
             raise web.HTTPNoContent(text=text, content_type='text/plain')
 
     @staticmethod
-    async def form_response_text_according_future_result(future, command_uuid):
+    async def form_response_text_according_future_result(future, command_uuid, state_data):
         """Этот метод проверяет статус футуры и в зависимости
         от этого формирует текст для response
         Если футура выполнена, она удаляется из словаря
@@ -44,7 +49,7 @@ class HandlersUtils(object):
         if future.done():
             try:
                 future_result = future.result()
-                pizza_bot_main.command_status.pop(command_uuid)
+                state_data.command_status.pop(command_uuid)
             except asyncio.CancelledError:
                 future_result = ServerMessages.CANCELLED_FUTURE_MESSAGE
         else:
@@ -70,7 +75,7 @@ class HandlersUtils(object):
         raise web.HTTPBadRequest(text=message, content_type="text/plain")
 
     @staticmethod
-    async def create_result_future():
+    async def create_result_future(state_data):
         """Этот метод создает футуру на каждый запрос выполнения команды, отпарвленный на API
         добавляет в словарь всех футур
         :returns tuple (str, экземпляр класса _asyncio.Future)
@@ -78,11 +83,12 @@ class HandlersUtils(object):
         """
         operation_result = asyncio.get_running_loop().create_future()
         operation_result_uuid = str(uuid.uuid4())
-        pizza_bot_main.command_status[operation_result_uuid] = operation_result
+        print(state_data)
+        state_data.command_status[operation_result_uuid] = operation_result
         return operation_result_uuid, operation_result
 
     @classmethod
-    async def process_future_result(cls, command_uuid):
+    async def process_future_result(cls, command_uuid, state_data):
         """ Этот метод запускает формирование response
         о статусе выполнения команды, отправленной
         из админ панели
@@ -92,8 +98,10 @@ class HandlersUtils(object):
         :return future_result: str or KeyError если uuid команды
         не найден
         """
-        future = pizza_bot_main.command_status[command_uuid]
-        future_result = await cls.form_response_text_according_future_result(future, command_uuid)
+        future = state_data.command_status[command_uuid]
+        future_result = await cls.form_response_text_according_future_result(future,
+                                                                             command_uuid,
+                                                                             state_data)
         return future_result
 
     @classmethod
@@ -127,19 +135,14 @@ class HandlersUtils(object):
         return params_values_list
 
     @classmethod
-    async def turn_any_mode(cls, task_name, params=None):
+    async def turn_any_mode(cls, mode_name, state_data, params=None):
         """Этот метод включает заданный режим киоска по запросу, отправленному на API
-        :param task_name: небходимый метод
+        :param mode_name: небходимый метод
         :param params: list
         """
         print("Ок, включаем")
-        operation_result_uuid, operation_result = await cls.create_result_future()
-        asyncio.create_task(task_name(operation_result, params))
+        operation_result_uuid, operation_result = await cls.create_result_future(state_data)
+        asyncio.create_task(mode_name(operation_result, params))
         response = f"uuid:{operation_result_uuid}"
         return response
 
-    @staticmethod
-    async def is_open_for_new_orders(kiosk_current_state):
-        """Метод определяет можно ли принимать заказы.
-        На текущий момент просто проверят, что включен 'Рабочий режим' """
-        return True if kiosk_current_state == KioskModeNames.COOKINGMODE else False

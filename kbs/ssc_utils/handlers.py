@@ -6,7 +6,7 @@ import asyncio
 from ..data.kiosk_modes.kiosk_modes import KioskModeNames
 from ..data.server.server_const import ServerMessages, ServerConfig
 from .handler_utils import HandlersUtils
-from ..task_manager.pbm import pizza_bot_main
+
 
 
 class Handlers(HandlersUtils):
@@ -30,8 +30,9 @@ class Handlers(HandlersUtils):
 
         """
         print("Получили запрос текущего статуса киоска")
-        print(pizza_bot_main.current_state)
-        return web.Response(text=pizza_bot_main.current_state, content_type='text/plain')
+        state_data = await cls.get_state_data(request)
+        print(state_data.current_state)
+        return web.Response(text=state_data.current_state, content_type='text/plain')
 
     @classmethod
     async def status_command_handler(cls, request):
@@ -71,8 +72,9 @@ class Handlers(HandlersUtils):
         print("Получен запрос на статус команды")
         params_list = await cls.get_params_from_request(request, ["command_uuid"])
         command_uuid,  = params_list
+        state_data = await cls.get_state_data(request)
         try:
-            future_result = await cls.process_future_result(command_uuid)
+            future_result = await cls.process_future_result(command_uuid, state_data)
             return web.Response(text=future_result, content_type='text/plain')
         except KeyError:
             message = ServerMessages.UUID_COMMAND_NOT_FOUND
@@ -85,12 +87,12 @@ class Handlers(HandlersUtils):
         работоспособности оборудования и активации режима работы"""
 
         print("Получен запрос с оценкой можно ли работать")
-        is_ok_eq = pizza_bot_main.equipment.is_able_to_cook
-        current_state = pizza_bot_main.current_state
-        if current_state == KioskModeNames.COOKINGMODE and is_ok_eq:
-            response_text = "true"
-        else:
-            response_text = "false"
+
+        state_data = await cls.get_state_data(request)
+        try:
+            response_text = str(state_data.can_receive_order)
+        except KeyError:
+            response_text = "False"
         return web.Response(text=response_text, content_type='text/plain')
 
     @classmethod
@@ -131,12 +133,14 @@ class Handlers(HandlersUtils):
         """
         params_list = await cls.get_params_from_request(request, ["check_code"])
         new_order_id, = params_list
-        can_receive_new_order = await cls.is_open_for_new_orders(pizza_bot_main.current_state)
+        state_data = await cls.get_state_data(request)
+        can_receive_new_order = state_data.can_receive_order
+        # can_receive_new_order = await cls.is_open_for_new_orders(request.app["state"].current_state)
         if can_receive_new_order:
             try:
-                is_it_new_order = await pizza_bot_main.current_instance.checking_order_for_double(new_order_id)
+                is_it_new_order = await state_data.current_instance.checking_order_for_double(new_order_id)
                 if is_it_new_order:
-                    await asyncio.create_task(pizza_bot_main.current_instance.create_new_order(new_order_id))
+                    await asyncio.create_task(state_data.current_instance.create_new_order(new_order_id))
                     message = ServerMessages.ORDER_CREATED_MESSAGE
                     raise web.HTTPCreated(text=message, content_type='text/plain')
                 else:
@@ -172,13 +176,15 @@ class Handlers(HandlersUtils):
          """
         print("Получили запрос на включение режима готовки")
         ALREADY_ON_STATES = (KioskModeNames.COOKINGMODE, KioskModeNames.BEFORECOOKING)
-        current_kiosk_state = pizza_bot_main.current_state
+        state_data = await cls.get_state_data(request)
+        current_kiosk_state = state_data.current_state
 
         if current_kiosk_state in ALREADY_ON_STATES:
             await cls.response_state_is_already_on()
 
         elif current_kiosk_state == KioskModeNames.STANDBYMODE:
-            response = await cls.turn_any_mode(pizza_bot_main.start_cooking_mode)
+            mode_name = state_data.start_cooking_mode
+            response = await cls.turn_any_mode(mode_name, state_data)
             return web.Response(text=response)
 
         elif current_kiosk_state == KioskModeNames.TESTINGMODE:
@@ -206,7 +212,8 @@ class Handlers(HandlersUtils):
 
         """
         print("Получили запрос на включение режима тестирования")
-        current_kiosk_state = pizza_bot_main.current_state
+        state_data = await cls.get_state_data(request)
+        current_kiosk_state = state_data.current_state
         print("Вот этот стейт", current_kiosk_state)
 
         if current_kiosk_state == KioskModeNames.COOKINGMODE:
@@ -214,7 +221,8 @@ class Handlers(HandlersUtils):
 
         elif current_kiosk_state == KioskModeNames.STANDBYMODE:
             params = [ServerConfig.FULL_TESTING_CODE]
-            response = await cls.turn_any_mode(pizza_bot_main.start_testing, params)
+            mode_name = state_data.start_testing
+            response = await cls.turn_any_mode(mode_name, state_data, params)
             return web.Response(text=response, content_type='text/plain')
 
         elif current_kiosk_state == KioskModeNames.TESTINGMODE:
@@ -256,11 +264,13 @@ class Handlers(HandlersUtils):
 
         """
 
-        current_kiosk_state = pizza_bot_main.current_state
+        state_data = await cls.get_state_data(request)
+        current_kiosk_state = state_data.current_state
         if current_kiosk_state == KioskModeNames.STANDBYMODE:
             key_list = ["testing_type", "unit_type", "unit_id"]
             params_list = await cls.get_params_from_request(request, key_list)
-            response = await cls.turn_any_mode(pizza_bot_main.start_testing, params_list)
+            mode_name = state_data.start_testing
+            response = await cls.turn_any_mode(mode_name,state_data, params_list)
             return web.Response(text=response, content_type='application/json')
         else:
             await cls.response_state_is_busy(current_kiosk_state)
@@ -296,6 +306,7 @@ class Handlers(HandlersUtils):
 
         """
         key_list = ["unit_type", "unit_id"]
+        state_data = await cls.get_state_data(request)
         params_list = await cls.get_params_from_request(request, key_list)
-        message = await pizza_bot_main.unit_activation(params_list)
+        message = await state_data.unit_activation(params_list)
         return web.Response(text=message, content_type='text/plain')

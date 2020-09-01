@@ -2,12 +2,10 @@
 import asyncio
 import uuid
 
-from contextvars import ContextVar
-
 from .equipment import Equipment
 from kbs.data.server.server_const import ServerConfig, ServerMessages
-from kbs.data.kiosk_modes.kiosk_modes import KioskModeNames
-from kbs.cntrls_api.ControllerBus import ControllersEvents
+from ..data.kiosk_modes.kiosk_modes import KioskModeNames
+
 from kbs.notifications.discord_sender import DiscordBotAccess
 from kbs.task_manager.kiosk_state.CookingMode.mode_main import CookingMode
 from kbs.task_manager.kiosk_state.CookingMode.before_cooking import BeforeCooking
@@ -15,7 +13,7 @@ from kbs.task_manager.kiosk_state import StandByMode
 from kbs.task_manager.kiosk_state import TestingMode
 
 
-class PizzaBotMain(object):
+class KioskState(object):
     """ Это основной класс (дописать)
 
     """
@@ -35,6 +33,16 @@ class PizzaBotMain(object):
         """
         current_name = self.current_instance.__class__.__str__(self)
         return current_name
+
+    @property
+    def can_receive_order(self):
+        """ Это проперти, которое проверяет включен ли режим готовки
+        и доступен ли минимальный набор оборудования """
+
+        if self.current_state == KioskModeNames.COOKINGMODE and self.equipment.is_able_to_cook:
+            return True
+        else:
+            return False
 
     async def start_cooking_mode(self, future=None, params=None):
         """Это метод непосредственно включает режим готовки
@@ -173,5 +181,3 @@ class PizzaBotMain(object):
                 message_to_send = await self.messages_for_sending.get()
                 await self.discord_bot_client.send_messages(message_to_send)
             await asyncio.sleep(1)
-
-pizza_bot_main = PizzaBotMain()

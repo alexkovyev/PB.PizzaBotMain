@@ -28,6 +28,7 @@ class DishStatus(object):
     def __init__(self, time_changes_event):
         self.status = "received"
         self.is_dish_ready = None
+        self.is_informed = False
         self.time_changes_event = time_changes_event
 
     @property

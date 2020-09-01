@@ -33,6 +33,7 @@ class CookingMode(CookingModeHandlers, Utils):
         self.current_orders_proceed = {}
         # self.orders_requested_for_delivery = {}
         self.oven_time_changes_event = {"event": asyncio.Event(), "result": None}
+
         # разные полезные очереди по приоритету
         self.main_queue = asyncio.Queue()
         self.high_priority_queue = asyncio.Queue()
@@ -94,12 +95,23 @@ class CookingMode(CookingModeHandlers, Utils):
         """
         futura_result = await self.oven_time_changes_event["result"]
         print("ЭТО СРАБОТАЛА ФУТУРА", futura_result)
+        still_cooking_dishes = []
         for oven in futura_result:
             print(oven)
             lock = asyncio.Lock()
             async with lock:
+                oven_object = self.equipment.ovens.oven_units[oven]
+                stop_baking_time_before = oven_object.stop_baking_time
+                if stop_baking_time_before < futura_result[oven] and not None:
+                    still_cooking_dishes.append(oven_object.dish)
+                    print("Это блюдо стало готовится позднее")
                 self.equipment.ovens.oven_units[oven].stop_baking_time = futura_result[oven]
             print("Это результат сетера", self.equipment.ovens.oven_units[oven].stop_baking_time)
+        if still_cooking_dishes:
+            for dish in still_cooking_dishes:
+                dish_object = await self.get_dish_object(dish, self.current_orders_proceed)
+                if dish_object.is_informed:
+                    print("Нужно поменять статус в БД")
 
     async def clear_time_changes_monitor(self):
         lock = asyncio.Lock()
@@ -144,9 +156,11 @@ class CookingMode(CookingModeHandlers, Utils):
         for dish in dish_list:
             print("Записываем статус блюда на почти готово", dish)
             dish_object = await self.get_dish_object(dish, self.current_orders_proceed)
+            dish_object.is_informed = True
             print("1 блюдо в заказе?", dish_object.is_last_dish_in_order)
             if dish_object.is_last_dish_in_order:
                 print("заказ почти готов", dish_object.order_ref_id)
+                # как добавить что заказ то готов?
 
     async def dish_inform_monitor(self):
         """

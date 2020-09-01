@@ -117,6 +117,7 @@ class Ovens(object):
 
 
 class OvenUnit(object):
+    """ dish - это объект или номер?"""
     def __init__(self, oven_data):
         self.oven_id = oven_data["oven_id"]
         self.status = oven_data["status"]
